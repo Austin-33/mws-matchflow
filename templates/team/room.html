@@ -1,0 +1,602 @@
+﻿{% extends 'base.html' %}
+{% block title %}{{ team.name }} — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+
+<!-- ─── Header ──────────────────────────────────────────────── -->
+<div class="page-header">
+  <div style="display: flex; align-items: center; gap: 20px;">
+    <div style="width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+         background: {{ team.primary_color or '#2563eb' }};
+         display: flex; align-items: center; justify-content: center;
+         font-size: 1.4rem; font-weight: 900; color: {{ team.secondary_color or '#ffffff' }};
+         border: 3px solid var(--border); box-shadow: 0 0 20px {{ team.primary_color or '#2563eb' }}44;">
+      {{ team.initials }}
+    </div>
+    <div>
+      <div class="page-title">{{ team.name }}
+        {% if team.short_name %}
+        <span style="font-size: 0.8rem; background: rgba(37,99,235,0.15); color: var(--neon-glow);
+                     padding: 3px 10px; border-radius: 6px; margin-left: 8px; font-weight: 600;">
+          {{ team.short_name }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="page-subtitle">
+        {% if team.city %}📍 {{ team.city }}{% if team.country %}, {{ team.country }}{% endif %}{% endif %}
+        {% if team.founded_date %} · 📅 Fundado em {{ team.founded_date }}{% endif %}
+        {% if team.sport %} · {{ '⚽ Futsal' if team.sport == 'futsal' else '🏟️ Futebol 11' }}{% endif %}
+      </div>
+    </div>
+  </div>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <a href="{{ url_for('team.export_team_excel', team_id=team.id) }}" class="btn btn-success btn-sm">
+      📥 Exportar Excel
+    </a>
+    <a href="{{ url_for('team.edit_team', team_id=team.id) }}" class="btn btn-secondary btn-sm">✏️ Editar</a>
+    <form method="POST" action="{{ url_for('team.delete_team', team_id=team.id) }}"
+          onsubmit="return confirm('Eliminar esta equipa e todos os seus dados?')">
+      <button type="submit" class="btn btn-danger btn-sm">🗑️ Eliminar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Stats rápidas ────────────────────────────────────────── -->
+<div class="stats-grid" style="margin-bottom: 24px;">
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value">{{ players | length }}</div>
+    <div class="stat-label">Plantel Total</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value" style="color: var(--success);">{{ active | length }}</div>
+    <div class="stat-label">Ativos</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🤕</div>
+    <div class="stat-value" style="color: var(--warning);">{{ injured | length }}</div>
+    <div class="stat-label">Lesionados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🟥</div>
+    <div class="stat-value" style="color: var(--danger);">{{ suspended | length }}</div>
+    <div class="stat-label">Suspensos</div>
+  </div>
+</div>
+
+<!-- ─── Tabs ─────────────────────────────────────────────────── -->
+<div class="tabs">
+  <a href="#info" class="tab-btn active" onclick="showTab('info',this)">🏟️ Clube</a>
+  <a href="#plantel" class="tab-btn" onclick="showTab('plantel',this)">👥 Plantel</a>
+  <a href="#lineup" class="tab-btn" onclick="showTab('lineup',this)">📋 Line-up</a>
+  <a href="#proximos" class="tab-btn" onclick="showTab('proximos',this)">📅 Próximos</a>
+  <a href="#posts" class="tab-btn" onclick="showTab('posts',this)">📢 Sala</a>
+  <a href="#add-player" class="tab-btn" onclick="showTab('add-player',this)">➕ Adicionar</a>
+  <a href="#import" class="tab-btn" onclick="showTab('import',this)">📊 Excel</a>
+</div>
+
+<!-- ─── Tab: Info ────────────────────────────────────────────── -->
+<div id="info" class="tab-content">
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+    <!-- Identidade -->
+    <div class="card">
+      <div class="card-title">🏟️ Identidade</div>
+      {% set info_rows = [
+        ('Modalidade', '⚽ Futsal' if team.sport == 'futsal' else '🏟️ Futebol 11'),
+        ('Cidade', team.city),
+        ('País', team.country),
+        ('Fundação', team.founded_date),
+        ('Pavilhão', team.stadium),
+      ] %}
+      {% for label, val in info_rows %}
+      <div style="display: flex; justify-content: space-between; padding: 9px 0;
+                  border-bottom: 1px solid var(--border); font-size: 0.85rem;">
+        <span style="color: var(--text-muted);">{{ label }}</span>
+        <span style="font-weight: 600; text-align: right; max-width: 60%;">{{ val or '—' }}</span>
+      </div>
+      {% endfor %}
+      <!-- Color swatches -->
+      <div style="display: flex; justify-content: space-between; padding: 9px 0; font-size: 0.85rem;">
+        <span style="color: var(--text-muted);">Cores</span>
+        <div style="display: flex; gap: 6px;">
+          <div style="width: 22px; height: 22px; border-radius: 50%;
+               background: {{ team.primary_color or '#2563eb' }}; border: 2px solid var(--border);"
+               title="{{ team.primary_color }}"></div>
+          <div style="width: 22px; height: 22px; border-radius: 50%;
+               background: {{ team.secondary_color or '#ffffff' }}; border: 2px solid var(--border);"
+               title="{{ team.secondary_color }}"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Direcção -->
+    <div class="card">
+      <div class="card-title">👔 Direcção</div>
+      {% set dir_rows = [
+        ('CEO / Presidente', team.ceo),
+        ('Dir. Desportivo', team.manager),
+        ('Treinador', team.coach),
+        ('Adjunto', team.assistant_coach),
+        ('Capitão', team.captain),
+      ] %}
+      {% for label, val in dir_rows %}
+      <div style="display: flex; justify-content: space-between; padding: 9px 0;
+                  border-bottom: 1px solid var(--border); font-size: 0.85rem;">
+        <span style="color: var(--text-muted);">{{ label }}</span>
+        <span style="font-weight: 600;">{{ val or '—' }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Jogo & Contacto -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div class="card">
+        <div class="card-title">🎮 Sistema de Jogo</div>
+        <div style="display: flex; justify-content: space-between; padding: 9px 0;
+                    border-bottom: 1px solid var(--border); font-size: 0.85rem;">
+          <span style="color: var(--text-muted);">Formação</span>
+          <span style="font-weight: 700; color: var(--neon-glow); font-size: 1rem;">{{ team.formation or '—' }}</span>
+        </div>
+        <div style="padding: 9px 0; font-size: 0.85rem;">
+          <span style="color: var(--text-muted);">Tática</span>
+          <div style="margin-top: 4px; font-weight: 500; color: var(--text-secondary);">{{ team.tactic or '—' }}</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📞 Contactos</div>
+        {% if team.email %}
+        <div style="font-size: 0.8rem; padding: 4px 0; color: var(--text-secondary);">📧 {{ team.email }}</div>
+        {% endif %}
+        {% if team.phone %}
+        <div style="font-size: 0.8rem; padding: 4px 0; color: var(--text-secondary);">📱 {{ team.phone }}</div>
+        {% endif %}
+        {% if team.website %}
+        <div style="font-size: 0.8rem; padding: 4px 0;">
+          🌐 <a href="{{ team.website }}" target="_blank" style="color: var(--neon-glow);">{{ team.website }}</a>
+        </div>
+        {% endif %}
+        {% if team.instagram %}
+        <div style="font-size: 0.8rem; padding: 4px 0; color: var(--accent);">📸 {{ team.instagram }}</div>
+        {% endif %}
+        {% if not team.email and not team.phone and not team.website and not team.instagram %}
+        <div style="color: var(--text-muted); font-size: 0.8rem;">Sem contactos registados.</div>
+        {% endif %}
+      </div>
+      {% if team.notes %}
+      <div class="card">
+        <div class="card-title">📝 Notas</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">{{ team.notes }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── Tab: Plantel ─────────────────────────────────────────── -->
+<div id="plantel" class="tab-content" style="display: none;">
+
+  {% if players %}
+  <!-- Filter bar -->
+  <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 0.8rem; color: var(--text-muted);">Filtrar:</span>
+    <button class="tab-btn active" onclick="filterStatus('all', this)" style="font-size: 0.75rem; padding: 5px 12px;">Todos ({{ players|length }})</button>
+    <button class="tab-btn" onclick="filterStatus('ativo', this)" style="font-size: 0.75rem; padding: 5px 12px; color: var(--success);">✅ Ativos ({{ active|length }})</button>
+    <button class="tab-btn" onclick="filterStatus('lesionado', this)" style="font-size: 0.75rem; padding: 5px 12px; color: var(--warning);">🤕 Lesionados ({{ injured|length }})</button>
+    <button class="tab-btn" onclick="filterStatus('suspenso', this)" style="font-size: 0.75rem; padding: 5px 12px; color: var(--danger);">🟥 Suspensos ({{ suspended|length }})</button>
+  </div>
+
+  <div class="table-wrapper">
+    <table id="players-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nome</th>
+          <th>Alcunha</th>
+          <th>Posição</th>
+          <th>Idade</th>
+          <th>Nac.</th>
+          <th>Alt.</th>
+          <th>Pé</th>
+          <th>Estado</th>
+          <th>⚽</th>
+          <th>🎯</th>
+          <th>🟨</th>
+          <th>🟥</th>
+          <th>Jogos</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in players %}
+        <tr data-status="{{ p.status }}">
+          <td style="color: var(--text-muted); font-weight: 700;">{{ p.number or '—' }}</td>
+          <td style="font-weight: 600;">{{ p.name }}</td>
+          <td style="color: var(--accent); font-style: italic;">{{ p.nickname or '—' }}</td>
+          <td>
+            <span style="font-size: 0.7rem; background: rgba(37,99,235,0.12); color: var(--neon-glow);
+                         padding: 2px 8px; border-radius: 4px; font-weight: 600;">{{ p.position or '—' }}</span>
+          </td>
+          <td>{{ p.age or '—' }}</td>
+          <td>{{ p.nationality or '—' }}</td>
+          <td>{{ (p.height_cm | string + ' cm') if p.height_cm else '—' }}</td>
+          <td>{{ p.dominant_foot or '—' }}</td>
+          <td>
+            {% if p.status == 'ativo' %}
+              <span class="badge badge-active">Ativo</span>
+            {% elif p.status == 'lesionado' %}
+              <span class="badge badge-pending">🤕 Lesionado</span>
+            {% elif p.status == 'suspenso' %}
+              <span class="badge badge-live">🟥 Suspenso</span>
+            {% else %}
+              <span class="badge badge-finished">Inativo</span>
+            {% endif %}
+          </td>
+          <td style="color: var(--success); font-weight: 700;">{{ p.goals }}</td>
+          <td style="color: var(--accent); font-weight: 700;">{{ p.assists }}</td>
+          <td style="color: #f59e0b; font-weight: 700;">{{ p.yellow_cards }}</td>
+          <td style="color: var(--danger); font-weight: 700;">{{ p.red_cards }}</td>
+          <td>{{ p.matches_played }}</td>
+          <td>
+            <div style="display: flex; gap: 4px;">
+              <a href="{{ url_for('team.edit_player', player_id=p.id) }}" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 0.7rem;">✏️</a>
+              <form method="POST" action="{{ url_for('team.delete_player', player_id=p.id) }}"
+                    onsubmit="return confirm('Remover {{ p.name }}?')">
+                <button type="submit" class="btn btn-danger btn-sm" style="padding: 3px 8px; font-size: 0.7rem;">✕</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-icon">👤</div>
+    <p>Nenhum jogador no plantel ainda.</p>
+    <button class="btn btn-primary" onclick="showTab('add-player', document.querySelector('[href=\'#add-player\']'))">
+      ➕ Adicionar Jogador
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ─── Tab: Adicionar Jogador ───────────────────────────────── -->
+<div id="add-player" class="tab-content" style="display: none;">
+  <div style="max-width: 800px;">
+    <form method="POST" action="{{ url_for('team.add_player', team_id=team.id) }}">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+        <div class="card">
+          <div class="card-title">👤 Dados Pessoais</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nome Completo *</label>
+              <input type="text" name="name" class="form-control" placeholder="Nome do jogador" required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Alcunha / Nome de Guerra</label>
+              <input type="text" name="nickname" class="form-control" placeholder="Ex: Ronaldo, Messi..." />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Data de Nascimento</label>
+              <input type="date" name="birth_date" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Idade</label>
+              <input type="number" name="age" class="form-control" placeholder="Ex: 22" min="14" max="60" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nacionalidade</label>
+              <input type="text" name="nationality" class="form-control" placeholder="Ex: Português" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nº CC / Passaporte</label>
+              <input type="text" name="id_number" class="form-control" placeholder="Documento de identificação" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Telefone</label>
+              <input type="text" name="phone" class="form-control" placeholder="+351 912..." />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" placeholder="jogador@email.com" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">⚽ Dados Desportivos</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nº Camisola</label>
+              <input type="number" name="number" class="form-control" placeholder="1-99" min="1" max="99" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Posição Principal</label>
+              <select name="position" class="form-control">
+                <option value="">Selecionar...</option>
+                {% for pos in positions %}
+                <option value="{{ pos }}">{{ pos }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Posição Secundária</label>
+              <select name="secondary_position" class="form-control">
+                <option value="">—</option>
+                {% for pos in positions %}
+                <option value="{{ pos }}">{{ pos }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Pé Dominante</label>
+              <select name="dominant_foot" class="form-control">
+                <option value="Direito">Direito</option>
+                <option value="Esquerdo">Esquerdo</option>
+                <option value="Ambos">Ambos</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Altura (cm)</label>
+              <input type="number" name="height_cm" class="form-control" placeholder="Ex: 178" min="140" max="220" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Peso (kg)</label>
+              <input type="number" name="weight_kg" class="form-control" placeholder="Ex: 75" min="40" max="150" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select name="status" class="form-control">
+                <option value="ativo">✅ Ativo</option>
+                <option value="lesionado">🤕 Lesionado</option>
+                <option value="suspenso">🟥 Suspenso</option>
+                <option value="inativo">⬛ Inativo</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Contrato Início</label>
+              <input type="date" name="contract_start" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Contrato Fim</label>
+              <input type="date" name="contract_end" class="form-control" />
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div style="margin-top: 16px;">
+        <button type="submit" class="btn btn-primary">➕ Adicionar ao Plantel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ─── Tab: Importar Excel ──────────────────────────────────── -->
+<div id="import" class="tab-content" style="display: none;">
+  <div style="max-width: 700px;">
+
+    <!-- Download template -->
+    <div class="card" style="margin-bottom: 20px; border-color: var(--neon);">
+      <div class="card-title">📋 Passo 1 — Descarrega o Template</div>
+      <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.6;">
+        Usa o template oficial do AUSTIN LEAGUE CORE para garantir que os dados são importados corretamente.
+        O ficheiro já inclui exemplos e instruções.
+      </p>
+      <a href="{{ url_for('team.download_excel_template') }}" class="btn btn-success">
+        📥 Descarregar Template Excel (.xlsx)
+      </a>
+    </div>
+
+    <!-- Colunas aceites -->
+    <div class="card" style="margin-bottom: 20px;">
+      <div class="card-title">📌 Colunas Reconhecidas</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.8rem;">
+        {% for col in [
+          ('Nome *', 'Obrigatório'),
+          ('Alcunha', 'Nome de guerra'),
+          ('Nº', 'Número da camisola'),
+          ('Posição', 'GR, FIX, ALA-D...'),
+          ('Data Nascimento', 'AAAA-MM-DD'),
+          ('Idade', 'Número inteiro'),
+          ('Nacionalidade', 'Ex: Português'),
+          ('CC', 'Nº documento'),
+          ('Telefone', 'Contacto'),
+          ('Email', 'Email do jogador'),
+          ('Altura', 'Em cm'),
+          ('Peso', 'Em kg'),
+          ('Pé', 'Direito/Esquerdo/Ambos'),
+          ('Estado', 'ativo/lesionado/suspenso'),
+          ('Contrato Inicio', 'AAAA-MM-DD'),
+          ('Contrato Fim', 'AAAA-MM-DD'),
+        ] %}
+        <div style="display: flex; gap: 8px; padding: 6px 10px; background: var(--bg-primary);
+                    border-radius: 6px; border: 1px solid var(--border);">
+          <span style="font-weight: 700; color: {{ 'var(--neon-glow)' if '*' in col[0] else 'var(--text-secondary)' }};">
+            {{ col[0] }}
+          </span>
+          <span style="color: var(--text-muted);">— {{ col[1] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div class="card" style="border-color: var(--accent);">
+      <div class="card-title">📤 Passo 2 — Importar Ficheiro</div>
+      <form method="POST" action="{{ url_for('team.import_players_excel', team_id=team.id) }}"
+            enctype="multipart/form-data" id="import-form">
+        <div class="form-group">
+          <label class="form-label">Selecionar ficheiro Excel (.xlsx / .xls)</label>
+          <div id="drop-zone" style="border: 2px dashed var(--border); border-radius: var(--radius);
+               padding: 40px; text-align: center; cursor: pointer; transition: 0.2s;"
+               onclick="document.getElementById('excel-input').click()"
+               ondragover="event.preventDefault(); this.style.borderColor='var(--neon)'"
+               ondragleave="this.style.borderColor='var(--border)'"
+               ondrop="handleDrop(event)">
+            <div style="font-size: 2.5rem; margin-bottom: 8px;">📊</div>
+            <div style="font-weight: 600; color: var(--text-primary);" id="drop-label">
+              Arrasta o ficheiro aqui ou clica para selecionar
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Suporta .xlsx e .xls
+            </div>
+          </div>
+          <input type="file" name="excel_file" id="excel-input" accept=".xlsx,.xls"
+                 style="display: none;" onchange="updateDropLabel(this)" />
+        </div>
+
+        <div style="background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3);
+                    border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 16px;
+                    font-size: 0.8rem; color: var(--warning);">
+          ⚠️ Jogadores com o mesmo nome já existentes na equipa serão ignorados (sem duplicados).
+        </div>
+
+        <button type="submit" class="btn btn-primary" id="import-btn">
+          🚀 Importar Jogadores
+        </button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).style.display = 'block';
+  if (btn) btn.classList.add('active');
+  return false;
+}
+
+function filterStatus(status, btn) {
+  document.querySelectorAll('#players-table tbody tr').forEach(row => {
+    row.style.display = (status === 'all' || row.dataset.status === status) ? '' : 'none';
+  });
+  document.querySelectorAll('[onclick^="filterStatus"]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function updateDropLabel(input) {
+  if (input.files.length > 0) {
+    document.getElementById('drop-label').textContent = '✅ ' + input.files[0].name;
+    document.getElementById('drop-zone').style.borderColor = 'var(--success)';
+  }
+}
+
+function handleDrop(event) {
+  event.preventDefault();
+  const file = event.dataTransfer.files[0];
+  if (file) {
+    const input = document.getElementById('excel-input');
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    input.files = dt.files;
+    updateDropLabel(input);
+  }
+  event.currentTarget.style.borderColor = 'var(--border)';
+}
+
+document.getElementById('import-form').addEventListener('submit', function() {
+  document.getElementById('import-btn').textContent = '⏳ A importar...';
+  document.getElementById('import-btn').disabled = true;
+});
+</script>
+
+<!-- ─── Tab: Line-up ─────────────────────────────────────────── -->
+{% include 'team/_lineup_tab.html' %}
+
+<!-- ─── Tab: Próximos Jogos ──────────────────────────────────── -->
+<div id="proximos" class="tab-content" style="display:none;">
+  {% if next_matches %}
+  <div style="max-width:700px;">
+    {% for m in next_matches %}
+    <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom:10px;">
+      <div class="match-team">
+        {% if m.team1.logo_url %}<img src="{{ url_for('static', filename=m.team1.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-right:8px;" />{% endif %}
+        <div class="team-name">{{ m.team1.name }}</div>
+      </div>
+      <div class="match-score">
+        <div class="score-display" style="font-size:1rem;color:var(--text-muted);">vs</div>
+        <div class="match-meta">
+          <span class="badge badge-scheduled">{{ m.date }} {{ m.time }}</span>
+        </div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">{{ m.tournament.name }}</div>
+      </div>
+      <div class="match-team right">
+        <div class="team-name">{{ m.team2.name }}</div>
+        {% if m.team2.logo_url %}<img src="{{ url_for('static', filename=m.team2.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-left:8px;" />{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📅</div><p>Sem jogos agendados.</p></div>
+  {% endif %}
+</div>
+
+<!-- ─── Tab: Sala da Equipa (Posts) ─────────────────────────── -->
+<div id="posts" class="tab-content" style="display:none;">
+  <div style="max-width:700px;">
+
+    <!-- New post form -->
+    <div class="card" style="margin-bottom:20px;border-color:var(--neon);">
+      <div class="card-title">📢 Nova Publicação</div>
+      <form method="POST" action="{{ url_for('feed.create_post') }}" enctype="multipart/form-data">
+        <input type="hidden" name="next" value="{{ url_for('team.team_room', team_id=team.id) }}#posts" />
+        <!-- Pre-tag this team and set scope to team -->
+        <input type="hidden" name="scope" value="team" />
+        <input type="hidden" name="tagged_teams" value="{{ team.id }}" />
+        <div class="form-group">
+          <select name="post_type" class="form-control" style="width:auto;margin-bottom:10px;">
+            <option value="announce">📢 Anúncio</option>
+            <option value="news">📰 Notícia</option>
+            <option value="lineup">📋 Convocatória</option>
+            <option value="highlight">⭐ Destaque</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <input type="text" name="title" class="form-control" placeholder="Título (opcional)" style="margin-bottom:8px;" />
+          <textarea name="content" class="form-control" rows="3"
+                    placeholder="Escreve aqui a tua publicação..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Imagem (opcional)</label>
+          <input type="file" name="image" accept="image/*" class="form-control" style="padding:6px;" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">📢 Publicar</button>
+      </form>
+    </div>
+
+    <!-- Posts feed -->
+    {% if team_feed_posts %}
+    {% for post in team_feed_posts %}
+    {% include 'feed/_post_card.html' %}
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><div class="empty-icon">📢</div><p>Nenhuma publicação ainda.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

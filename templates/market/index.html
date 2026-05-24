@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% block title %}Mercado Livre — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">🏪 Mercado Livre</div>
+    <div class="page-subtitle">Jogadores, treinadores e CEOs disponíveis para contrato.</div>
+  </div>
+  {% if current_user.current_team_id %}
+  <form method="POST" action="{{ url_for('market.leave_team') }}"
+        onsubmit="return confirm('Tens a certeza que queres sair da equipa?')">
+    <button class="btn btn-danger btn-sm">🚪 Sair da Equipa</button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- ─── O meu estado ─────────────────────────────────────────── -->
+{% if current_user.sport_role in ['player','coach','ceo'] %}
+<div class="card" style="margin-bottom:24px;border-color:{% if current_user.current_team_id %}var(--success){% else %}var(--warning){% endif %};">
+  <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="width:48px;height:48px;border-radius:50%;
+         background:linear-gradient(135deg,var(--neon),var(--accent));
+         display:flex;align-items:center;justify-content:center;
+         font-size:1.2rem;font-weight:900;color:white;flex-shrink:0;">
+      {{ current_user.display_name[0].upper() }}
+    </div>
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:1rem;">{{ current_user.display_name }}</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);">
+        {{ current_user.role_label }}
+        {% if current_user.preferred_position %} · {{ current_user.preferred_position }}{% endif %}
+      </div>
+    </div>
+    <div>
+      {% if current_user.current_team_id %}
+        {% set my_team = current_user.current_team_id | string %}
+        <span class="badge badge-active">✅ Com equipa</span>
+      {% else %}
+        <span class="badge badge-pending">⏳ Agente Livre</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+
+  <!-- ─── Coluna Esquerda: Agentes Livres ─────────────────── -->
+  <div>
+    <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+                color:var(--text-muted);margin-bottom:14px;">
+      🏃 Agentes Livres ({{ free_agents|length }})
+    </div>
+
+    {% if free_agents %}
+    {% for agent in free_agents %}
+    <div class="card" style="margin-bottom:10px;padding:14px 16px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:40px;height:40px;border-radius:50%;flex-shrink:0;
+             background:linear-gradient(135deg,var(--neon),var(--accent2));
+             display:flex;align-items:center;justify-content:center;
+             font-weight:900;color:white;font-size:0.9rem;">
+          {{ agent.display_name[0].upper() }}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:0.9rem;">{{ agent.display_name }}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">
+            {{ agent.role_label }}
+            {% if agent.preferred_position %}
+            · <span style="color:var(--neon-glow);font-weight:600;">{{ agent.preferred_position }}</span>
+            {% endif %}
+          </div>
+          <div style="font-size:0.7rem;color:var(--text-muted);">
+            📅 Disponível desde {{ agent.created_at.strftime('%d/%m/%Y') if agent.created_at else '—' }}
+          </div>
+        </div>
+        <div style="flex-shrink:0;">
+          {% if current_user.id == agent.id %}
+          <span style="font-size:0.7rem;color:var(--neon-glow);">← Tu</span>
+          {% else %}
+          <a href="{{ url_for('market.player_profile', user_id=agent.id) }}"
+             class="btn btn-secondary btn-sm" style="font-size:0.72rem;padding:4px 10px;">
+            Ver Perfil
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" style="padding:40px 20px;">
+      <div class="empty-icon">🏃</div>
+      <p>Nenhum agente livre de momento.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ─── Coluna Direita ───────────────────────────────────── -->
+  <div style="display:flex;flex-direction:column;gap:20px;">
+
+    <!-- Enviar pedido (só para jogadores/treinadores/CEO livres) -->
+    {% if current_user.sport_role in ['player','coach','ceo'] %}
+    <div class="card" style="border-color:var(--neon);">
+      <div class="card-title">
+        {% if current_user.current_team_id %}🔄 Pedir Transferência{% else %}📋 Pedir Contrato{% endif %}
+      </div>
+      <form method="POST" action="{{ url_for('market.send_request') }}">
+        <div class="form-group">
+          <label class="form-label">Equipa de destino</label>
+          <select name="team_id" class="form-control" required>
+            <option value="">Escolher equipa...</option>
+            {% for t in teams %}
+            <option value="{{ t.id }}">
+              {{ t.name }}
+              {% if t.id == current_user.current_team_id %}(atual){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensagem (opcional)</label>
+          <textarea name="message" class="form-control" rows="3"
+                    placeholder="Apresenta-te à equipa, fala das tuas qualidades..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">
+          {% if current_user.current_team_id %}🔄 Enviar Pedido de Transferência{% else %}📋 Enviar Pedido de Contrato{% endif %}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Os meus pedidos -->
+    {% if my_requests %}
+    <div class="card">
+      <div class="card-title">📬 Os Meus Pedidos</div>
+      {% for req in my_requests %}
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div>
+            <span style="font-weight:600;">{{ req.team.name }}</span>
+            <span style="font-size:0.7rem;color:var(--text-muted);margin-left:6px;">{{ req.type_label }}</span>
+          </div>
+          <span class="badge badge-{% if req.status=='accepted' %}active{% elif req.status=='rejected' %}live{% elif req.status=='cancelled' %}finished{% else %}pending{% endif %}">
+            {{ req.status_label }}
+          </span>
+        </div>
+        {% if req.message %}
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;font-style:italic;">
+          "{{ req.message|truncate(80) }}"
+        </div>
+        {% endif %}
+        {% if req.response_message %}
+        <div style="font-size:0.75rem;color:var(--accent);margin-top:4px;">
+          💬 {{ req.response_message }}
+        </div>
+        {% endif %}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;">
+          <span style="font-size:0.68rem;color:var(--text-muted);">
+            {{ req.created_at.strftime('%d/%m/%Y %H:%M') if req.created_at else '' }}
+          </span>
+          {% if req.status == 'pending' %}
+          <form method="POST" action="{{ url_for('market.cancel_request', req_id=req.id) }}">
+            <button type="submit" class="btn btn-danger btn-sm" style="padding:2px 8px;font-size:0.68rem;">
+              Cancelar
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Pedidos recebidos (para quem tem autoridade na equipa) -->
+    {% if incoming %}
+    <div class="card" style="border-color:var(--warning);">
+      <div class="card-title" style="color:var(--warning);">
+        📥 Pedidos Recebidos ({{ incoming|length }})
+      </div>
+      {% for req in incoming %}
+      <div style="padding:12px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+          <div style="width:36px;height:36px;border-radius:50%;
+               background:linear-gradient(135deg,var(--neon),var(--accent));
+               display:flex;align-items:center;justify-content:center;
+               font-weight:900;color:white;font-size:0.85rem;flex-shrink:0;">
+            {{ req.user.display_name[0].upper() }}
+          </div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:0.875rem;">{{ req.user.display_name }}</div>
+            <div style="font-size:0.72rem;color:var(--text-muted);">
+              {{ req.user.role_label }}
+              {% if req.user.preferred_position %} · {{ req.user.preferred_position }}{% endif %}
+              · {{ req.type_label }}
+            </div>
+          </div>
+          <a href="{{ url_for('market.player_profile', user_id=req.user_id) }}"
+             class="btn btn-secondary btn-sm" style="font-size:0.7rem;padding:3px 8px;">
+            Ver Perfil
+          </a>
+        </div>
+
+        {% if req.message %}
+        <div style="background:var(--bg-primary);border-radius:6px;padding:8px 10px;
+                    font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;
+                    border-left:3px solid var(--neon);font-style:italic;">
+          "{{ req.message }}"
+        </div>
+        {% endif %}
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <!-- Aceitar -->
+          <form method="POST" action="{{ url_for('market.accept_request', req_id=req.id) }}"
+                style="display:flex;gap:6px;flex:1;">
+            <input type="text" name="response_message" class="form-control"
+                   placeholder="Mensagem de boas-vindas (opcional)"
+                   style="font-size:0.75rem;padding:5px 8px;" />
+            <button type="submit" class="btn btn-success btn-sm"
+                    style="white-space:nowrap;"
+                    onclick="return confirm('Aceitar {{ req.user.display_name }}?')">
+              ✅ Aceitar
+            </button>
+          </form>
+          <!-- Recusar -->
+          <form method="POST" action="{{ url_for('market.reject_request', req_id=req.id) }}">
+            <button type="submit" class="btn btn-danger btn-sm"
+                    onclick="return confirm('Recusar pedido?')">
+              ❌ Recusar
+            </button>
+          </form>
+        </div>
+
+        <div style="font-size:0.68rem;color:var(--text-muted);margin-top:6px;">
+          {{ req.created_at.strftime('%d/%m/%Y %H:%M') if req.created_at else '' }}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

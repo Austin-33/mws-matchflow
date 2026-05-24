@@ -1,0 +1,180 @@
+﻿{% extends 'base.html' %}
+{% block title %}{{ match.team1.name }} vs {{ match.team2.name }} — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">⚽ Detalhe do Jogo</div>
+    <div class="page-subtitle">
+      🏆 {{ match.tournament.name }} ·
+      {% if match.phase == 'group' %}Jornada {{ match.round_number }}
+      {% elif match.phase == 'round_of_16' %}Oitavos de Final
+      {% elif match.phase == 'quarter' %}Quartos de Final
+      {% elif match.phase == 'semi' %}Meia-Final
+      {% elif match.phase == 'final' %}🏆 FINAL
+      {% endif %}
+      · {{ match.date }}
+    </div>
+  </div>
+  <a href="{{ url_for('match.list_matches') }}" class="btn btn-secondary">← Voltar</a>
+</div>
+
+<!-- Scoreboard -->
+<div class="card" style="margin-bottom: 24px; text-align: center; padding: 40px 20px;
+     background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));">
+  <div style="display: flex; align-items: center; justify-content: center; gap: 40px;">
+    <div style="flex: 1; text-align: right;">
+      <a href="{{ url_for('team.team_room', team_id=match.team1_id) }}"
+         style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); text-decoration: none;">
+        {{ match.team1.name }}
+      </a>
+    </div>
+    <div style="text-align: center; min-width: 140px;">
+      <div style="font-size: 3rem; font-weight: 900; color: var(--neon-glow); letter-spacing: 0.1em;">
+        {{ match.score_display }}
+      </div>
+      <div style="margin-top: 8px;">
+        <span class="badge badge-{{ match.status }}">
+          {% if match.status == 'finished' %}✅ Terminado
+          {% elif match.status == 'live' %}🔴 AO VIVO
+          {% else %}⏳ {{ match.time }}{% endif %}
+        </span>
+      </div>
+    </div>
+    <div style="flex: 1; text-align: left;">
+      <a href="{{ url_for('team.team_room', team_id=match.team2_id) }}"
+         style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); text-decoration: none;">
+        {{ match.team2.name }}
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Registar Resultado -->
+  {% if match.status != 'finished' %}
+  <div class="card">
+    <div class="card-title">🏆 Registar Resultado</div>
+    <form method="POST" action="{{ url_for('match.update_result', match_id=match.id) }}">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">{{ match.team1.name }}</label>
+          <input type="number" name="score1" class="form-control" placeholder="0" min="0" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">{{ match.team2.name }}</label>
+          <input type="number" name="score2" class="form-control" placeholder="0" min="0" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-success">✅ Confirmar Resultado</button>
+    </form>
+  </div>
+  {% endif %}
+
+  <!-- Estatísticas dos Jogadores -->
+  <div class="card" style="{{ 'grid-column: 1 / -1;' if match.status == 'finished' }}">
+    <div class="card-title">📊 Estatísticas dos Jogadores</div>
+    <form method="POST" action="{{ url_for('match.update_player_stats', match_id=match.id) }}">
+      <div class="grid-2">
+        <!-- Team 1 -->
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--neon-glow); margin-bottom: 12px;">
+            {{ match.team1.name }}
+          </div>
+          {% for p in team1_players %}
+          <div style="padding: 10px; background: var(--bg-primary); border-radius: var(--radius-sm);
+                      margin-bottom: 8px; border: 1px solid var(--border);">
+            <input type="hidden" name="player_id" value="{{ p.id }}" />
+            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 8px;">
+              {{ p.number or '—' }}. {{ p.name }}
+              <span style="font-size: 0.7rem; color: var(--text-muted);">{{ p.position }}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+              {% set existing = stats | selectattr('player_id', 'equalto', p.id) | first %}
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">⚽ Golos</div>
+                <input type="number" name="goals_{{ p.id }}" class="form-control"
+                       value="{{ existing.goals if existing else 0 }}" min="0" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🎯 Assist.</div>
+                <input type="number" name="assists_{{ p.id }}" class="form-control"
+                       value="{{ existing.assists if existing else 0 }}" min="0" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🟨</div>
+                <input type="number" name="yellow_{{ p.id }}" class="form-control"
+                       value="{{ existing.yellow_cards if existing else 0 }}" min="0" max="2" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🟥</div>
+                <input type="number" name="red_{{ p.id }}" class="form-control"
+                       value="{{ existing.red_cards if existing else 0 }}" min="0" max="1" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">⏱️ Min</div>
+                <input type="number" name="minutes_{{ p.id }}" class="form-control"
+                       value="{{ existing.minutes_played if existing else 90 }}" min="0" max="120" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <!-- Team 2 -->
+        <div>
+          <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent); margin-bottom: 12px;">
+            {{ match.team2.name }}
+          </div>
+          {% for p in team2_players %}
+          <div style="padding: 10px; background: var(--bg-primary); border-radius: var(--radius-sm);
+                      margin-bottom: 8px; border: 1px solid var(--border);">
+            <input type="hidden" name="player_id" value="{{ p.id }}" />
+            <div style="font-weight: 600; font-size: 0.85rem; margin-bottom: 8px;">
+              {{ p.number or '—' }}. {{ p.name }}
+              <span style="font-size: 0.7rem; color: var(--text-muted);">{{ p.position }}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+              {% set existing = stats | selectattr('player_id', 'equalto', p.id) | first %}
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">⚽ Golos</div>
+                <input type="number" name="goals_{{ p.id }}" class="form-control"
+                       value="{{ existing.goals if existing else 0 }}" min="0" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🎯 Assist.</div>
+                <input type="number" name="assists_{{ p.id }}" class="form-control"
+                       value="{{ existing.assists if existing else 0 }}" min="0" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🟨</div>
+                <input type="number" name="yellow_{{ p.id }}" class="form-control"
+                       value="{{ existing.yellow_cards if existing else 0 }}" min="0" max="2" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">🟥</div>
+                <input type="number" name="red_{{ p.id }}" class="form-control"
+                       value="{{ existing.red_cards if existing else 0 }}" min="0" max="1" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+              <div>
+                <div style="font-size: 0.6rem; color: var(--text-muted); margin-bottom: 2px;">⏱️ Min</div>
+                <input type="number" name="minutes_{{ p.id }}" class="form-control"
+                       value="{{ existing.minutes_played if existing else 90 }}" min="0" max="120" style="padding: 4px 6px; font-size: 0.8rem;" />
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if team1_players or team2_players %}
+      <div style="margin-top: 16px;">
+        <button type="submit" class="btn btn-primary">💾 Guardar Estatísticas</button>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+
+</div>
+{% endblock %}

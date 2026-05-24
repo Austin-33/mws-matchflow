@@ -1,0 +1,325 @@
+{% extends 'base.html' %}
+{% block title %}Match Play — {{ match.team1.name }} vs {{ match.team2.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">▶ Match Play</div>
+    <div class="page-subtitle">{{ match.tournament.name }} · {{ match.phase_label }} · {{ match.date }}</div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    {% if match.status == 'scheduled' %}
+    <form method="POST" action="{{ url_for('match.start_match', match_id=match.id) }}">
+      <button class="btn btn-success">▶ Iniciar Jogo</button>
+    </form>
+    {% elif match.status == 'live' %}
+    <form method="POST" action="{{ url_for('match.end_match', match_id=match.id) }}"
+          onsubmit="return confirm('Terminar o jogo?')">
+      <button class="btn btn-danger">⏹ Terminar Jogo</button>
+    </form>
+    {% endif %}
+    <a href="{{ url_for('match.match_detail', match_id=match.id) }}" class="btn btn-secondary">← Detalhe</a>
+  </div>
+</div>
+
+<!-- ─── Scoreboard ──────────────────────────────────────────── -->
+<div class="card" id="scoreboard" style="margin-bottom:20px;padding:32px 20px;text-align:center;
+     background:linear-gradient(135deg,var(--bg-card),var(--bg-secondary));border-color:var(--neon);">
+  <div style="display:flex;align-items:center;justify-content:center;gap:32px;">
+
+    <!-- Team 1 -->
+    <div style="flex:1;text-align:right;">
+      {% if match.team1.logo_url %}
+      <img src="{{ url_for('static', filename=match.team1.logo_url) }}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;margin-bottom:8px;" />
+      {% else %}
+      <div style="width:48px;height:48px;border-radius:50%;background:{{ match.team1.primary_color or '#2563eb' }};display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:white;margin-bottom:8px;">{{ match.team1.initials }}</div>
+      {% endif %}
+      <div style="font-size:1.2rem;font-weight:800;">{{ match.team1.name }}</div>
+    </div>
+
+    <!-- Score -->
+    <div style="text-align:center;min-width:160px;">
+      <div id="score-display" style="font-size:3.5rem;font-weight:900;color:var(--neon-glow);letter-spacing:0.1em;line-height:1;">
+        {{ match.score1 if match.score1 is not none else '0' }} — {{ match.score2 if match.score2 is not none else '0' }}
+      </div>
+      <div style="margin-top:8px;">
+        <span class="badge badge-{{ match.status }}">
+          {% if match.status=='live' %}🔴 AO VIVO{% elif match.status=='finished' %}✅ FT{% else %}⏳ Agendado{% endif %}
+        </span>
+      </div>
+      {% if match.status == 'live' %}
+      <div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted);" id="minute-display">
+        ⏱ <span id="minute-val">{{ match.minute_current or 0 }}</span>'
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Team 2 -->
+    <div style="flex:1;text-align:left;">
+      {% if match.team2.logo_url %}
+      <img src="{{ url_for('static', filename=match.team2.logo_url) }}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;margin-bottom:8px;" />
+      {% else %}
+      <div style="width:48px;height:48px;border-radius:50%;background:{{ match.team2.primary_color or '#06b6d4' }};display:inline-flex;align-items:center;justify-content:center;font-weight:900;color:white;margin-bottom:8px;">{{ match.team2.initials }}</div>
+      {% endif %}
+      <div style="font-size:1.2rem;font-weight:800;">{{ match.team2.name }}</div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+  <!-- ─── Painel de Eventos ─────────────────────────────────── -->
+  <div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">⚡ Registar Evento</div>
+
+      <div class="form-group">
+        <label class="form-label">Minuto</label>
+        <input type="number" id="ev-minute" class="form-control" value="{{ match.minute_current or 0 }}" min="0" max="120" style="width:100px;" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Equipa</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn btn-secondary" id="btn-team1" onclick="selectTeam({{ match.team1_id }}, this)" style="flex:1;">{{ match.team1.name }}</button>
+          <button type="button" class="btn btn-secondary" id="btn-team2" onclick="selectTeam({{ match.team2_id }}, this)" style="flex:1;">{{ match.team2.name }}</button>
+        </div>
+        <input type="hidden" id="ev-team" value="" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Jogador Principal</label>
+        <select id="ev-player" class="form-control">
+          <option value="">— Selecionar —</option>
+          <optgroup label="{{ match.team1.name }}" id="og-team1">
+            {% for p in team1_players %}
+            <option value="{{ p.id }}" data-team="{{ match.team1_id }}">{{ p.number or '?' }}. {{ p.display_name }}</option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="{{ match.team2.name }}" id="og-team2">
+            {% for p in team2_players %}
+            <option value="{{ p.id }}" data-team="{{ match.team2_id }}">{{ p.number or '?' }}. {{ p.display_name }}</option>
+            {% endfor %}
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="form-group" id="assist-group" style="display:none;">
+        <label class="form-label">Assistência (opcional)</label>
+        <select id="ev-player2" class="form-control">
+          <option value="">— Nenhuma —</option>
+          {% for p in team1_players %}
+          <option value="{{ p.id }}" data-team="{{ match.team1_id }}">{{ p.number or '?' }}. {{ p.display_name }}</option>
+          {% endfor %}
+          {% for p in team2_players %}
+          <option value="{{ p.id }}" data-team="{{ match.team2_id }}">{{ p.number or '?' }}. {{ p.display_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Descrição (opcional)</label>
+        <input type="text" id="ev-desc" class="form-control" placeholder="Ex: Cabeceamento, Livre direto..." />
+      </div>
+
+      <!-- Event type buttons -->
+      <div class="form-label" style="margin-bottom:8px;">Tipo de Evento</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+        {% for etype, label, color in [
+          ('goal','⚽ Golo','var(--success)'),
+          ('own_goal','🥅 Autogolo','var(--warning)'),
+          ('penalty','🎯 Penálti','var(--accent)'),
+          ('yellow_card','🟨 Amarelo','#f59e0b'),
+          ('red_card','🟥 Vermelho','var(--danger)'),
+          ('foul','⚠️ Falta','var(--text-muted)'),
+          ('foul_yellow','⚠️🟨 Falta+Amarelo','#f59e0b'),
+          ('foul_red','⚠️🟥 Falta+Vermelho','var(--danger)'),
+          ('substitution','🔄 Substituição','var(--accent2)'),
+        ] %}
+        <button type="button" class="btn btn-secondary"
+                style="font-size:0.75rem;padding:8px 6px;border-color:{{ color }};color:{{ color }};"
+                onclick="addEvent('{{ etype }}')">{{ label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Event log -->
+    <div class="card">
+      <div class="card-title">📋 Eventos do Jogo</div>
+      <div id="events-log" style="max-height:300px;overflow-y:auto;">
+        {% if events %}
+        {% for ev in events %}
+        <div class="event-row" id="ev-{{ ev.id }}" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;">
+          <span style="font-weight:700;color:var(--neon-glow);min-width:32px;">{{ ev.minute }}'</span>
+          <span style="font-size:1rem;">{{ ev.icon }}</span>
+          <div style="flex:1;">
+            <span style="font-weight:600;">{{ ev.team.name if ev.team else '—' }}</span>
+            {% if ev.player %} · {{ ev.player.display_name }}{% endif %}
+            {% if ev.player2 %} <span style="color:var(--text-muted);">({{ ev.player2.display_name }})</span>{% endif %}
+            {% if ev.description %}<div style="font-size:0.75rem;color:var(--text-muted);">{{ ev.description }}</div>{% endif %}
+          </div>
+          <button onclick="deleteEvent({{ ev.id }}, this)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:0.8rem;">✕</button>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div id="no-events" style="color:var(--text-muted);font-size:0.85rem;padding:12px 0;">Nenhum evento ainda.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Onze Inicial ──────────────────────────────────────── -->
+  <div>
+    <!-- Team 1 Lineup -->
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">👕 Onze — {{ match.team1.name }}</div>
+      <form method="POST" action="{{ url_for('match.save_lineup', match_id=match.id) }}">
+        <input type="hidden" name="team_id" value="{{ match.team1_id }}" />
+        <div class="form-group">
+          <label class="form-label">Formação</label>
+          <select name="formation" class="form-control">
+            {% for f in ['1-2-1','1-3','2-2','3-1','4-3-3','4-4-2','4-2-3-1'] %}
+            <option value="{{ f }}" {{ 'selected' if match.team1.formation == f }}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Titulares</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            {% for p in team1_players %}
+            {% set in_lineup = lineup1|selectattr('player_id','equalto',p.id)|selectattr('is_starter','equalto',True)|list %}
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;cursor:pointer;padding:4px 8px;background:var(--bg-primary);border-radius:6px;border:1px solid {{ 'var(--neon)' if in_lineup else 'var(--border)' }};">
+              <input type="checkbox" name="starters" value="{{ p.id }}" {{ 'checked' if in_lineup }} style="accent-color:var(--neon);" />
+              <span>{{ p.number or '?' }}. {{ p.display_name }}</span>
+              <span style="font-size:0.65rem;color:var(--text-muted);">{{ p.position or '' }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Onze</button>
+      </form>
+    </div>
+
+    <!-- Team 2 Lineup -->
+    <div class="card">
+      <div class="card-title">👕 Onze — {{ match.team2.name }}</div>
+      <form method="POST" action="{{ url_for('match.save_lineup', match_id=match.id) }}">
+        <input type="hidden" name="team_id" value="{{ match.team2_id }}" />
+        <div class="form-group">
+          <label class="form-label">Formação</label>
+          <select name="formation" class="form-control">
+            {% for f in ['1-2-1','1-3','2-2','3-1','4-3-3','4-4-2','4-2-3-1'] %}
+            <option value="{{ f }}" {{ 'selected' if match.team2.formation == f }}>{{ f }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Titulares</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            {% for p in team2_players %}
+            {% set in_lineup = lineup2|selectattr('player_id','equalto',p.id)|selectattr('is_starter','equalto',True)|list %}
+            <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;cursor:pointer;padding:4px 8px;background:var(--bg-primary);border-radius:6px;border:1px solid {{ 'var(--neon)' if in_lineup else 'var(--border)' }};">
+              <input type="checkbox" name="starters" value="{{ p.id }}" {{ 'checked' if in_lineup }} style="accent-color:var(--neon);" />
+              <span>{{ p.number or '?' }}. {{ p.display_name }}</span>
+              <span style="font-size:0.65rem;color:var(--text-muted);">{{ p.position or '' }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Onze</button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const MATCH_ID = {{ match.id }};
+const TEAM1_ID = {{ match.team1_id }};
+const TEAM2_ID = {{ match.team2_id }};
+let selectedTeam = null;
+
+function selectTeam(teamId, btn) {
+  selectedTeam = teamId;
+  document.getElementById('ev-team').value = teamId;
+  document.querySelectorAll('#btn-team1, #btn-team2').forEach(b => {
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text-secondary)';
+  });
+  btn.style.borderColor = 'var(--neon)';
+  btn.style.color = 'var(--neon-glow)';
+}
+
+function addEvent(eventType) {
+  const minute = parseInt(document.getElementById('ev-minute').value) || 0;
+  const teamId = document.getElementById('ev-team').value;
+  const playerId = document.getElementById('ev-player').value;
+  const player2Id = document.getElementById('ev-player2').value;
+  const desc = document.getElementById('ev-desc').value;
+
+  if (!teamId) { alert('Seleciona uma equipa primeiro!'); return; }
+
+  fetch(`/matches/${MATCH_ID}/event`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      event_type: eventType, minute, team_id: parseInt(teamId),
+      player_id: playerId || null, player2_id: player2Id || null,
+      description: desc
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      // Update score
+      document.getElementById('score-display').textContent =
+        `${data.score1} — ${data.score2}`;
+
+      // Add event to log
+      const log = document.getElementById('events-log');
+      const noEv = document.getElementById('no-events');
+      if (noEv) noEv.remove();
+
+      const icons = {goal:'⚽',own_goal:'🥅',yellow_card:'🟨',red_card:'🟥',
+                     foul:'⚠️',foul_yellow:'⚠️🟨',foul_red:'⚠️🟥',
+                     substitution:'🔄',penalty:'🎯'};
+
+      const row = document.createElement('div');
+      row.id = `ev-${data.event.id}`;
+      row.className = 'event-row';
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem;';
+      row.innerHTML = `
+        <span style="font-weight:700;color:var(--neon-glow);min-width:32px;">${data.event.minute}'</span>
+        <span style="font-size:1rem;">${icons[data.event.type] || '📋'}</span>
+        <div style="flex:1;font-weight:600;">${data.event.description || data.event.type}</div>
+        <button onclick="deleteEvent(${data.event.id}, this)" style="background:none;border:none;color:var(--danger);cursor:pointer;">✕</button>
+      `;
+      log.insertBefore(row, log.firstChild);
+
+      // Clear inputs
+      document.getElementById('ev-desc').value = '';
+    }
+  })
+  .catch(e => alert('Erro: ' + e));
+}
+
+function deleteEvent(eventId, btn) {
+  if (!confirm('Remover este evento?')) return;
+  fetch(`/matches/event/${eventId}/delete`, {method:'POST'})
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      document.getElementById(`ev-${eventId}`)?.remove();
+      document.getElementById('score-display').textContent =
+        `${data.score1} — ${data.score2}`;
+    }
+  });
+}
+
+// Show assist field for goals
+document.getElementById('ev-player').addEventListener('change', function() {
+  const type = document.querySelector('.btn-secondary[style*="var(--neon)"]');
+  document.getElementById('assist-group').style.display = 'block';
+});
+</script>
+{% endblock %}

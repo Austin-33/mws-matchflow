@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% block title %}{{ agent.display_name }} — Mercado Livre{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">👤 {{ agent.display_name }}</div>
+    <div class="page-subtitle">Perfil de Agente Livre</div>
+  </div>
+  <a href="{{ url_for('market.free_market') }}" class="btn btn-secondary">← Mercado</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:800px;">
+
+  <!-- Perfil -->
+  <div class="card">
+    <div class="card-title">🪪 Identificação</div>
+
+    <div style="text-align:center;padding:20px 0;">
+      {% if player and player.photo_url %}
+      <img src="{{ url_for('static', filename=player.photo_url) }}"
+           style="width:80px;height:80px;border-radius:50%;object-fit:cover;
+                  border:3px solid var(--neon);margin-bottom:12px;" />
+      {% else %}
+      <div style="width:80px;height:80px;border-radius:50%;margin:0 auto 12px;
+           background:linear-gradient(135deg,var(--neon),var(--accent));
+           display:flex;align-items:center;justify-content:center;
+           font-size:2rem;font-weight:900;color:white;">
+        {{ agent.display_name[0].upper() }}
+      </div>
+      {% endif %}
+      <div style="font-size:1.2rem;font-weight:800;">{{ agent.display_name }}</div>
+      <div style="font-size:0.85rem;color:var(--text-muted);">@{{ agent.username }}</div>
+      <div style="margin-top:8px;">
+        <span class="badge badge-{% if agent.current_team_id %}active{% else %}pending{% endif %}">
+          {% if agent.current_team_id %}✅ Com equipa{% else %}⏳ Agente Livre{% endif %}
+        </span>
+      </div>
+    </div>
+
+    {% set rows = [
+      ('Função', agent.role_label),
+      ('Posição', agent.preferred_position or '—'),
+      ('Membro desde', agent.created_at.strftime('%d/%m/%Y') if agent.created_at else '—'),
+    ] %}
+    {% if player %}
+    {% set rows = rows + [
+      ('Nacionalidade', player.nationality or '—'),
+      ('Idade', (player.age | string + ' anos') if player.age else '—'),
+      ('Altura', (player.height_cm | string + ' cm') if player.height_cm else '—'),
+      ('Pé dominante', player.dominant_foot or '—'),
+    ] %}
+    {% endif %}
+    {% for label, val in rows %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;
+                border-bottom:1px solid var(--border);font-size:0.85rem;">
+      <span style="color:var(--text-muted);">{{ label }}</span>
+      <span style="font-weight:600;">{{ val }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Estatísticas + Pedido -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    {% if player and (player.goals or player.assists or player.matches_played) %}
+    <div class="card">
+      <div class="card-title">📊 Estatísticas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+        {% for icon, label, val in [
+          ('⚽','Golos', player.goals),
+          ('🎯','Assistências', player.assists),
+          ('🎮','Jogos', player.matches_played),
+          ('🟨','Amarelos', player.yellow_cards),
+          ('🟥','Vermelhos', player.red_cards),
+        ] %}
+        <div style="background:var(--bg-primary);border-radius:8px;padding:10px;
+                    border:1px solid var(--border);text-align:center;">
+          <div style="font-size:1.4rem;">{{ icon }}</div>
+          <div style="font-size:1.2rem;font-weight:800;color:var(--neon-glow);">{{ val or 0 }}</div>
+          <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">{{ label }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Enviar pedido (só se for autoridade de equipa ou admin) -->
+    {% if current_user.role == 'admin' or (current_user.current_team_id and current_user.sport_role in ['coach','ceo']) %}
+    {% if not agent.current_team_id %}
+    <div class="card" style="border-color:var(--neon);">
+      <div class="card-title">📋 Convidar para a Equipa</div>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;">
+        Podes convidar este jogador diretamente para a tua equipa.
+        Ele receberá uma notificação.
+      </p>
+      <div style="font-size:0.8rem;color:var(--warning);margin-bottom:12px;">
+        ⚠️ Esta funcionalidade está em desenvolvimento. Por agora, o jogador deve enviar o pedido.
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <!-- Se sou eu próprio e estou livre -->
+    {% if current_user.id == agent.id and not agent.current_team_id %}
+    <div class="card" style="border-color:var(--neon);">
+      <div class="card-title">📋 Pedir Contrato</div>
+      <form method="POST" action="{{ url_for('market.send_request') }}">
+        <div class="form-group">
+          <label class="form-label">Equipa</label>
+          <select name="team_id" class="form-control" required>
+            <option value="">Escolher...</option>
+            {% for t in teams %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mensagem</label>
+          <textarea name="message" class="form-control" rows="3"
+                    placeholder="Apresenta-te..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">📋 Enviar Pedido</button>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}

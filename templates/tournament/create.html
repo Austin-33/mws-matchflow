@@ -1,0 +1,695 @@
+﻿{% extends 'base.html' %}
+{% block title %}Criar Torneio — AUSTIN LEAGUE CORE{% endblock %}
+{% block content %}
+<style>
+/* ── Wizard ── */
+.wstep{display:none}
+.wstep.on{display:block;animation:wfade .3s ease}
+@keyframes wfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* ── Format cards ── */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:600px){.fgrid{grid-template-columns:1fr}}
+.fcard{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 16px;
+  background:var(--bg-card);border:2px solid var(--border);border-radius:14px;
+  cursor:pointer;transition:.2s;text-align:center;position:relative;user-select:none}
+.fcard:hover{border-color:var(--neon);transform:translateY(-2px);box-shadow:0 6px 24px rgba(37,99,235,.15)}
+.fcard.sel{border-color:var(--neon);background:rgba(37,99,235,.08);box-shadow:0 0 20px rgba(37,99,235,.2)}
+.fcard .ficon{font-size:2.6rem;line-height:1}
+.fcard .fname{font-size:1.05rem;font-weight:900;color:var(--text-primary)}
+.fcard .fdesc{font-size:.75rem;color:var(--text-muted);line-height:1.5}
+.fcard .fcheck{position:absolute;top:8px;right:10px;width:18px;height:18px;border-radius:50%;
+  background:var(--neon);display:none;align-items:center;justify-content:center;font-size:.6rem;color:#fff}
+.fcard.sel .fcheck{display:flex}
+.fdiag{display:flex;align-items:center;gap:3px;flex-wrap:wrap;justify-content:center;margin-top:4px}
+.fnode{background:var(--bg-secondary);border:1px solid var(--border);border-radius:3px;
+  padding:2px 6px;font-size:.58rem;font-weight:700;color:var(--text-muted)}
+.farr{color:var(--text-muted);font-size:.65rem}
+/* ── Sport cards ── */
+.sgrid{display:flex;gap:10px}
+.scard{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px;
+  background:var(--bg-primary);border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:.2s}
+.scard:hover{border-color:var(--neon)}
+.scard.sel{border-color:var(--neon);background:rgba(37,99,235,.1)}
+.scard .si{font-size:1.8rem}
+.scard .sl{font-size:.8rem;font-weight:700;color:var(--text-primary)}
+/* ── Toggle pill ── */
+.tpill{display:flex;align-items:center;gap:14px;padding:12px 16px;
+  background:var(--bg-primary);border:2px solid var(--border);border-radius:8px;cursor:pointer;transition:.2s}
+.tpill:hover{border-color:var(--neon)}
+.tpill.on{border-color:var(--neon);background:rgba(37,99,235,.08)}
+.pill{width:40px;height:22px;border-radius:11px;background:var(--border);position:relative;transition:.3s;flex-shrink:0}
+.pill::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.3s}
+.tpill.on .pill{background:var(--neon)}
+.tpill.on .pill::after{left:21px}
+/* ── Slider ── */
+.srow{display:flex;align-items:center;gap:10px}
+.srow input[type=range]{flex:1;accent-color:var(--neon)}
+.sval{min-width:32px;text-align:center;font-weight:800;color:var(--neon-glow);font-size:1rem}
+/* ── Legs toggle ── */
+.ltog{display:flex;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;overflow:hidden;max-width:200px}
+.ltog label{flex:1;text-align:center;padding:7px 12px;font-size:.8rem;font-weight:600;cursor:pointer;color:var(--text-muted);transition:.2s}
+.ltog input:checked+label{background:var(--neon);color:#fff}
+.ltog input{display:none}
+/* ── Bracket preview ── */
+.bflow{display:flex;gap:0;align-items:stretch;overflow-x:auto;padding:4px 0}
+.bcol{display:flex;flex-direction:column;justify-content:space-around;min-width:80px}
+.blab{font-size:.52rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--neon-glow);text-align:center;margin-bottom:5px;padding:2px 5px;
+  background:rgba(37,99,235,.1);border-radius:3px}
+.bmatch{background:var(--bg-card);border:1px solid var(--border);border-radius:5px;
+  padding:4px 6px;font-size:.58rem;color:var(--text-muted);text-align:center;margin:2px 0;line-height:1.5}
+.bcon{width:16px;display:flex;flex-direction:column;justify-content:space-around;align-items:center;flex-shrink:0}
+.bline{width:100%;height:2px;background:var(--border)}
+/* ── Info box ── */
+.ibox{background:rgba(37,99,235,.07);border:1px solid rgba(37,99,235,.2);border-radius:8px;
+  padding:9px 13px;font-size:.78rem;color:var(--text-secondary)}
+.ibox strong{color:var(--neon-glow)}
+/* ── Drop zone ── */
+.dzone{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;
+  cursor:pointer;transition:.2s;background:var(--bg-primary)}
+.dzone:hover,.dzone.dov{border-color:var(--neon);background:rgba(37,99,235,.04)}
+/* ── Progress ── */
+.wprog{display:flex;align-items:center;gap:0;margin-bottom:24px}
+.wpi{display:flex;align-items:center;flex:1}
+.wpc{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.82rem;font-weight:800;border:2px solid var(--border);background:var(--bg-card);
+  color:var(--text-muted);flex-shrink:0;transition:.3s}
+.wpc.act{border-color:var(--neon);background:var(--neon);color:#fff;box-shadow:0 0 14px rgba(37,99,235,.5)}
+.wpc.don{border-color:var(--success);background:var(--success);color:#fff}
+.wpl{font-size:.68rem;font-weight:600;color:var(--text-muted);margin-left:7px;text-transform:uppercase;letter-spacing:.07em}
+.wpl.act{color:var(--neon-glow)}
+.wline{flex:1;height:2px;background:var(--border);margin:0 7px;transition:.3s}
+.wline.don{background:var(--success)}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">🚀 Criar <span>Torneio</span></div>
+    <div class="page-subtitle">Escolhe o formato e personaliza a competição.</div>
+  </div>
+  <a href="{{ url_for('tournament.list_tournaments') }}" class="btn btn-secondary">← Voltar</a>
+</div>
+
+<form method="POST" action="{{ url_for('tournament.create_tournament') }}"
+      enctype="multipart/form-data" id="wform" onsubmit="return prepareSubmit()">
+
+  <!-- ── ALL REAL FIELDS (single source of truth) ── -->
+  <input type="hidden" name="name"              id="f-name" />
+  <input type="hidden" name="start_date"        id="f-date" />
+  <input type="hidden" name="sport"             id="f-sport"    value="futsal" />
+  <input type="hidden" name="format_type"       id="f-fmt"      value="campeonato" />
+  <input type="hidden" name="type"              id="f-type"     value="grupos_eliminatoria" />
+  <input type="hidden" name="teams_count"       id="f-teams"    value="8" />
+  <input type="hidden" name="groups_count"      id="f-groups"   value="4" />
+  <input type="hidden" name="teams_per_group"   id="f-tpg"      value="4" />
+  <input type="hidden" name="qualify_per_group" id="f-qpg"      value="2" />
+  <input type="hidden" name="group_legs"        id="f-glegs"    value="1" />
+  <input type="hidden" name="knockout_legs"     id="f-klegs"    value="1" />
+  <!-- knockout phase flags — set by JS -->
+  <input type="hidden" name="has_groups"        id="f-hg"       value="" />
+  <input type="hidden" name="has_knockout"      id="f-hk"       value="" />
+  <input type="hidden" name="has_round_of_16"   id="f-hr16"     value="" />
+  <input type="hidden" name="has_quarter"       id="f-hqf"      value="" />
+  <input type="hidden" name="has_semi"          id="f-hsf"      value="" />
+  <input type="hidden" name="has_final"         id="f-hfin"     value="has_final" />
+  <input type="hidden" name="open_registration" id="f-openreg"  value="" />
+  <input type="file"   name="logo"              id="f-logo"     accept="image/*" style="display:none" />
+
+<div class="wizard-wrap" style="max-width:800px;margin:0 auto;">
+
+<!-- ════════════════════════════════════════════════════════
+     STEP 0 — FORMAT SELECTION
+════════════════════════════════════════════════════════ -->
+<div class="wstep on" id="step0">
+  <div style="text-align:center;margin-bottom:28px;">
+    <div style="font-size:.62rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--neon-glow);margin-bottom:6px;">Passo 1 de 3</div>
+    <h2 style="font-size:1.5rem;font-weight:900;color:var(--text-primary);margin-bottom:4px;">Escolhe o Formato</h2>
+    <p style="font-size:.88rem;color:var(--text-muted);">Seleciona o tipo de competição que queres criar.</p>
+  </div>
+
+  <div class="fgrid">
+    <div class="fcard sel" id="fc-campeonato" onclick="pickFmt('campeonato')">
+      <div class="fcheck">✓</div>
+      <div class="ficon">🏆</div>
+      <div class="fname">CAMPEONATO</div>
+      <div class="fdesc">Competição oficial com grupos e mata-mata</div>
+      <div class="fdiag">
+        <span class="fnode">Grupos</span><span class="farr">→</span>
+        <span class="fnode">QF</span><span class="farr">→</span>
+        <span class="fnode">SF</span><span class="farr">→</span>
+        <span class="fnode">Final</span>
+      </div>
+    </div>
+    <div class="fcard" id="fc-liga" onclick="pickFmt('liga')">
+      <div class="fcheck">✓</div>
+      <div class="ficon">⚽</div>
+      <div class="fname">LIGA</div>
+      <div class="fdesc">Todos contra todos, pontos acumulados</div>
+      <div class="fdiag">
+        <span class="fnode">Jornada 1</span><span class="farr">→</span>
+        <span class="fnode">…</span><span class="farr">→</span>
+        <span class="fnode">Jornada N</span>
+      </div>
+    </div>
+    <div class="fcard" id="fc-torneio" onclick="pickFmt('torneio')">
+      <div class="fcheck">✓</div>
+      <div class="ficon">🥇</div>
+      <div class="fname">TORNEIO</div>
+      <div class="fdesc">Eliminatória direta, mata-mata puro</div>
+      <div class="fdiag">
+        <span class="fnode">R16</span><span class="farr">→</span>
+        <span class="fnode">QF</span><span class="farr">→</span>
+        <span class="fnode">SF</span><span class="farr">→</span>
+        <span class="fnode">Final</span>
+      </div>
+    </div>
+    <div class="fcard" id="fc-taca" onclick="pickFmt('taca')">
+      <div class="fcheck">✓</div>
+      <div class="ficon">🏅</div>
+      <div class="fname">TAÇA</div>
+      <div class="fdesc">Formato de taça com rondas eliminatórias</div>
+      <div class="fdiag">
+        <span class="fnode">Ronda 1</span><span class="farr">→</span>
+        <span class="fnode">Ronda 2</span><span class="farr">→</span>
+        <span class="fnode">Final</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+    <button type="button" class="btn btn-secondary" style="min-width:220px;padding:12px 20px;" onclick="goStep(2)">
+      Avançar e Terminar →
+      <span style="display:block;font-size:.68rem;font-weight:400;opacity:.7;margin-top:2px;">Configuração mínima, defaults automáticos</span>
+    </button>
+    <button type="button" class="btn btn-primary" style="min-width:220px;padding:12px 20px;" onclick="goStep(1)">
+      Avançar e Personalizar →
+      <span style="display:block;font-size:.68rem;font-weight:400;opacity:.8;margin-top:2px;">Configuração completa passo a passo</span>
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     STEP 1 — PERSONALIZAR
+════════════════════════════════════════════════════════ -->
+<div class="wstep" id="step1">
+  <!-- Progress -->
+  <div class="wprog">
+    <div class="wpi"><div class="wpc don">✓</div><span class="wpl">Formato</span></div>
+    <div class="wline don"></div>
+    <div class="wpi"><div class="wpc act">2</div><span class="wpl act">Personalizar</span></div>
+    <div class="wline"></div>
+    <div class="wpi"><div class="wpc">3</div><span class="wpl">Terminar</span></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 260px;gap:20px;align-items:start;">
+  <div>
+
+  <!-- Identidade -->
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-title">🏆 Identidade</div>
+    <div class="form-group">
+      <label class="form-label">Nome do Torneio *</label>
+      <input type="text" id="v-name" class="form-control" placeholder="Ex: Liga Austin 2026"
+             oninput="syncField('f-name',this.value);syncField('v2-name',this.value);updatePrev()" />
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Desporto</label>
+        <div class="sgrid">
+          <div class="scard sel" id="sc1-futsal" onclick="pickSport('futsal')">
+            <span class="si">⚽</span><span class="sl">Futsal</span>
+          </div>
+          <div class="scard" id="sc1-football" onclick="pickSport('football')">
+            <span class="si">🏟️</span><span class="sl">Futebol 11</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de Início *</label>
+        <input type="date" id="v-date" class="form-control"
+               oninput="syncField('f-date',this.value);syncField('v2-date',this.value);updatePrev()" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Logo do Torneio</label>
+      <div class="dzone" id="dzone" onclick="document.getElementById('f-logo').click()">
+        <div style="font-size:1.8rem;margin-bottom:6px;">🖼️</div>
+        <div style="font-size:.82rem;color:var(--text-muted);">Clica ou arrasta a imagem aqui</div>
+        <div id="logo-prev" style="margin-top:10px;"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" id="v-openreg" style="width:16px;height:16px;accent-color:var(--neon);"
+               onchange="syncField('f-openreg',this.checked?'open_registration':'')" />
+        <span style="font-size:.85rem;color:var(--text-secondary);">Inscrições abertas</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Estrutura -->
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-title">🏗️ Estrutura</div>
+
+    <div class="form-group">
+      <label class="form-label">Nº de Equipas</label>
+      <div class="srow">
+        <input type="range" id="v-teams" min="4" max="64" value="8"
+               oninput="document.getElementById('v-teams-val').textContent=this.value;
+                        syncField('f-teams',this.value);
+                        updateGroupsInfo();renderBracket();updatePrev()" />
+        <span class="sval" id="v-teams-val">8</span>
+      </div>
+    </div>
+
+    <!-- Groups toggle — hidden for liga -->
+    <div id="groups-section" class="form-group">
+      <label class="form-label">Fase de Grupos?</label>
+      <div class="tpill" id="groups-pill" onclick="toggleGroups()">
+        <div class="pill"></div>
+        <div>
+          <div style="font-weight:700;font-size:.86rem;color:var(--text-primary);">Fase de Grupos</div>
+          <div style="font-size:.72rem;color:var(--text-muted);" id="groups-hint">Clica para ativar</div>
+        </div>
+      </div>
+      <div id="groups-opts" style="display:none;margin-top:14px;padding:14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Nº de Grupos</label>
+            <div class="srow">
+              <input type="range" id="v-groups" min="2" max="8" value="4"
+                     oninput="document.getElementById('v-groups-val').textContent=this.value;
+                              syncField('f-groups',this.value);
+                              updateGroupsInfo();renderBracket()" />
+              <span class="sval" id="v-groups-val">4</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Qualificam por Grupo</label>
+            <div class="srow">
+              <input type="range" id="v-qpg" min="1" max="4" value="2"
+                     oninput="document.getElementById('v-qpg-val').textContent=this.value;
+                              syncField('f-qpg',this.value);
+                              updateGroupsInfo();renderBracket()" />
+              <span class="sval" id="v-qpg-val">2</span>
+            </div>
+          </div>
+        </div>
+        <div class="ibox" id="groups-info" style="margin-bottom:12px;">
+          Equipas por grupo: <strong id="tpg-val">4</strong> &nbsp;|&nbsp;
+          Total qualificados: <strong id="qual-val">8</strong>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Voltas na Fase de Grupos</label>
+          <div class="ltog">
+            <input type="radio" name="v_glegs" id="vg1" value="1" checked onchange="syncField('f-glegs','1')" />
+            <label for="vg1">1 Volta</label>
+            <input type="radio" name="v_glegs" id="vg2" value="2" onchange="syncField('f-glegs','2')" />
+            <label for="vg2">2 Voltas</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Knockout -->
+    <div id="ko-section" class="form-group">
+      <label class="form-label">Mata-mata</label>
+      <div class="ibox" id="ko-info" style="margin-bottom:12px;">
+        Fases calculadas automaticamente com base no nº de equipas.
+      </div>
+      <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:12px;overflow-x:auto;margin-bottom:12px;">
+        <div style="font-size:.58rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Bracket Preview</div>
+        <div id="bracket-flow" class="bflow"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Voltas no Mata-mata</label>
+        <div class="ltog">
+          <input type="radio" name="v_klegs" id="vk1" value="1" checked onchange="syncField('f-klegs','1')" />
+          <label for="vk1">Jogo Único</label>
+          <input type="radio" name="v_klegs" id="vk2" value="2" onchange="syncField('f-klegs','2')" />
+          <label for="vk2">Ida e Volta</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <button type="button" class="btn btn-secondary" onclick="goStep(0)">← Formato</button>
+    <button type="submit" class="btn btn-primary" style="font-size:.95rem;padding:11px 28px;">🚀 Criar Torneio</button>
+  </div>
+
+  </div><!-- /main col -->
+
+  <!-- Preview sidebar -->
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:18px;position:sticky;top:20px;">
+    <div style="font-size:.58rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;">👁️ Preview</div>
+    <div style="font-size:1rem;font-weight:800;color:var(--text-primary);margin-bottom:5px;min-height:24px;" id="prev-name">Nome do Torneio</div>
+    <div style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:.68rem;font-weight:700;background:rgba(37,99,235,.15);color:var(--neon-glow);border:1px solid rgba(37,99,235,.3);margin-bottom:10px;" id="prev-badge">Campeonato</div>
+    <div style="font-size:.78rem;color:var(--text-secondary);line-height:2;">
+      <div>📅 <span id="prev-date">—</span></div>
+      <div>👥 <span id="prev-teams">8</span> equipas</div>
+      <div>🔄 <span id="prev-fmt">—</span></div>
+    </div>
+    <div id="prev-bracket" style="margin-top:12px;"></div>
+  </div>
+
+  </div><!-- /grid -->
+</div>
+
+<!-- ════════════════════════════════════════════════════════
+     STEP 2 — TERMINAR (minimal)
+════════════════════════════════════════════════════════ -->
+<div class="wstep" id="step2">
+  <!-- Progress -->
+  <div class="wprog">
+    <div class="wpi"><div class="wpc don">✓</div><span class="wpl">Formato</span></div>
+    <div class="wline don"></div>
+    <div class="wpi"><div class="wpc don">✓</div><span class="wpl">Rápido</span></div>
+    <div class="wline don"></div>
+    <div class="wpi"><div class="wpc act">3</div><span class="wpl act">Terminar</span></div>
+  </div>
+
+  <div style="max-width:520px;margin:0 auto;">
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">⚡ Configuração Rápida</div>
+      <p style="font-size:.83rem;color:var(--text-muted);margin-bottom:18px;">
+        Preenche o mínimo — o sistema configura tudo automaticamente com base no formato
+        <strong id="s2-badge" style="color:var(--neon-glow);">Campeonato</strong>.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Nome do Torneio *</label>
+        <input type="text" id="v2-name" class="form-control" placeholder="Ex: Liga Austin 2026"
+               oninput="syncField('f-name',this.value);syncField('v-name',this.value);updatePrev()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data de Início *</label>
+        <input type="date" id="v2-date" class="form-control"
+               oninput="syncField('f-date',this.value);syncField('v-date',this.value);updatePrev()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nº de Equipas</label>
+        <input type="number" id="v2-teams" class="form-control" value="8" min="2" max="64"
+               style="max-width:110px;"
+               oninput="syncField('f-teams',this.value);updatePrev()" />
+        <div class="ibox" style="margin-top:9px;font-size:.75rem;" id="s2-info">
+          O sistema configura automaticamente grupos, fases e bracket.
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Desporto</label>
+        <div class="sgrid">
+          <div class="scard sel" id="sc2-futsal" onclick="pickSport2('futsal')">
+            <span class="si">⚽</span><span class="sl">Futsal</span>
+          </div>
+          <div class="scard" id="sc2-football" onclick="pickSport2('football')">
+            <span class="si">🏟️</span><span class="sl">Futebol 11</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <button type="button" class="btn btn-secondary" onclick="goStep(0)">← Formato</button>
+      <button type="submit" class="btn btn-primary" style="font-size:.95rem;padding:11px 28px;">🚀 Criar Torneio</button>
+    </div>
+  </div>
+</div>
+
+</div><!-- /wizard-wrap -->
+</form>
+
+<script>
+// ── State ──────────────────────────────────────────────────────
+var curStep = 0;
+var curFmt  = 'campeonato';
+var grpsOn  = false;
+
+var FMT_TYPE = {
+  campeonato: 'grupos_eliminatoria',
+  liga:       'liga',
+  torneio:    'eliminatoria',
+  taca:       'eliminatoria'
+};
+var FMT_DEF = {
+  campeonato: {teams:16, groups:4, qpg:2, hasG:true,  hasK:true},
+  liga:       {teams:8,  groups:0, qpg:0, hasG:false, hasK:false},
+  torneio:    {teams:16, groups:0, qpg:0, hasG:false, hasK:true},
+  taca:       {teams:16, groups:0, qpg:0, hasG:false, hasK:true}
+};
+var FMT_LABELS = {
+  campeonato:'🏆 Campeonato', liga:'⚽ Liga', torneio:'🥇 Torneio', taca:'🏅 Taça'
+};
+var FMT_FMT = {
+  campeonato:'Grupos + Mata-mata', liga:'Round-robin', torneio:'Mata-mata direto', taca:'Rondas eliminatórias'
+};
+
+// ── Helpers ────────────────────────────────────────────────────
+function syncField(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.value = val;
+}
+function $(id) { return document.getElementById(id); }
+
+// ── Navigation ─────────────────────────────────────────────────
+function goStep(n) {
+  $('step' + curStep).classList.remove('on');
+  curStep = n;
+  $('step' + n).classList.add('on');
+  if (n === 1) applyFmtToStep1();
+  if (n === 2) applySmartDefaults();
+  updatePrev();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+// ── Format selection ───────────────────────────────────────────
+function pickFmt(fmt) {
+  curFmt = fmt;
+  ['campeonato','liga','torneio','taca'].forEach(function(f) {
+    $('fc-' + f).classList.toggle('sel', f === fmt);
+  });
+  syncField('f-fmt', fmt);
+  syncField('f-type', FMT_TYPE[fmt]);
+  updatePrev();
+}
+
+// ── Apply format defaults to step 1 ───────────────────────────
+function applyFmtToStep1() {
+  var def = FMT_DEF[curFmt];
+  // Teams
+  var ts = $('v-teams');
+  if (ts) { ts.value = def.teams; $('v-teams-val').textContent = def.teams; }
+  syncField('f-teams', def.teams);
+  // Groups section visibility
+  var gs = $('groups-section');
+  if (gs) gs.style.display = (curFmt === 'liga') ? 'none' : '';
+  // Groups toggle
+  grpsOn = def.hasG;
+  var pill = $('groups-pill');
+  if (pill) pill.classList.toggle('on', grpsOn);
+  var opts = $('groups-opts');
+  if (opts) opts.style.display = grpsOn ? '' : 'none';
+  var hint = $('groups-hint');
+  if (hint) hint.textContent = grpsOn ? 'Fase de grupos ativa' : 'Clica para ativar';
+  syncField('f-hg', grpsOn ? 'has_groups' : '');
+  // Knockout section
+  var ks = $('ko-section');
+  if (ks) ks.style.display = def.hasK ? '' : 'none';
+  syncField('f-hk', def.hasK ? 'has_knockout' : '');
+  // Groups values
+  if (def.hasG) {
+    var gv = $('v-groups'); if (gv) { gv.value = def.groups; $('v-groups-val').textContent = def.groups; }
+    var qv = $('v-qpg');    if (qv) { qv.value = def.qpg;    $('v-qpg-val').textContent = def.qpg; }
+    syncField('f-groups', def.groups);
+    syncField('f-qpg', def.qpg);
+  }
+  updateGroupsInfo();
+  renderBracket();
+}
+
+// ── Groups toggle ──────────────────────────────────────────────
+function toggleGroups() {
+  grpsOn = !grpsOn;
+  var pill = $('groups-pill');
+  if (pill) pill.classList.toggle('on', grpsOn);
+  var opts = $('groups-opts');
+  if (opts) opts.style.display = grpsOn ? '' : 'none';
+  var hint = $('groups-hint');
+  if (hint) hint.textContent = grpsOn ? 'Fase de grupos ativa' : 'Clica para ativar';
+  syncField('f-hg', grpsOn ? 'has_groups' : '');
+  updateGroupsInfo();
+  renderBracket();
+  updatePrev();
+}
+
+// ── Groups info ────────────────────────────────────────────────
+function updateGroupsInfo() {
+  var teams  = parseInt(($('v-teams')  || {value:'8'}).value)  || 8;
+  var groups = parseInt(($('v-groups') || {value:'4'}).value)  || 4;
+  var qpg    = parseInt(($('v-qpg')    || {value:'2'}).value)  || 2;
+  var tpg    = groups > 0 ? Math.round(teams / groups) : 0;
+  var qual   = groups * qpg;
+  var tv = $('tpg-val');  if (tv) tv.textContent = tpg;
+  var qv = $('qual-val'); if (qv) qv.textContent = qual;
+  syncField('f-tpg', tpg);
+  // Update ko info
+  var ki = $('ko-info');
+  if (ki) {
+    var phases = calcPhases(grpsOn ? qual : teams);
+    ki.innerHTML = 'Fases automáticas: <strong>' + phases.map(function(p){return p.l}).join(' → ') + '</strong>';
+  }
+}
+
+// ── Bracket phases ─────────────────────────────────────────────
+function calcPhases(n) {
+  var p = [];
+  if (n >= 16) p.push({l:'R16',   s:8});
+  if (n >= 8)  p.push({l:'QF',    s:4});
+  if (n >= 4)  p.push({l:'SF',    s:2});
+  p.push(       {l:'Final', s:1});
+  return p;
+}
+
+function setPhaseFlags(phases) {
+  syncField('f-hr16',  phases.some(function(p){return p.l==='R16'})   ? 'has_round_of_16' : '');
+  syncField('f-hqf',   phases.some(function(p){return p.l==='QF'})    ? 'has_quarter'     : '');
+  syncField('f-hsf',   phases.some(function(p){return p.l==='SF'})    ? 'has_semi'        : '');
+  syncField('f-hfin',  'has_final');
+}
+
+// ── Render bracket preview ─────────────────────────────────────
+function renderBracket() {
+  var container = $('bracket-flow');
+  if (!container) return;
+  var def = FMT_DEF[curFmt];
+  if (!def.hasK) { container.innerHTML = '<span style="color:var(--text-muted);font-size:.78rem;">Sem fase eliminatória</span>'; return; }
+  var teams  = parseInt(($('v-teams')  || {value:'8'}).value)  || 8;
+  var groups = parseInt(($('v-groups') || {value:'4'}).value)  || 4;
+  var qpg    = parseInt(($('v-qpg')    || {value:'2'}).value)  || 2;
+  var qual   = grpsOn ? (groups * qpg) : teams;
+  var phases = calcPhases(qual);
+  setPhaseFlags(phases);
+  var html = '';
+  phases.forEach(function(ph, i) {
+    html += '<div class="bcol"><div class="blab">' + ph.l + '</div>';
+    for (var j = 0; j < ph.s; j++) html += '<div class="bmatch">A Definir<br/>vs<br/>A Definir</div>';
+    html += '</div>';
+    if (i < phases.length - 1) html += '<div class="bcon"><div class="bline"></div></div>';
+  });
+  container.innerHTML = html;
+  // Mini preview in sidebar
+  var mini = $('prev-bracket');
+  if (mini) {
+    mini.innerHTML = '<div style="font-size:.6rem;color:var(--text-muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Bracket</div>'
+      + '<div style="display:flex;gap:3px;flex-wrap:wrap;">'
+      + phases.map(function(p){return '<span style="background:rgba(37,99,235,.1);border:1px solid rgba(37,99,235,.2);border-radius:3px;padding:2px 6px;font-size:.6rem;font-weight:700;color:var(--neon-glow);">'+p.l+'</span>'}).join('<span style="color:var(--text-muted);font-size:.65rem;">→</span>')
+      + '</div>';
+  }
+}
+
+// ── Sport selection ────────────────────────────────────────────
+function pickSport(s) {
+  $('sc1-futsal').classList.toggle('sel', s==='futsal');
+  $('sc1-football').classList.toggle('sel', s==='football');
+  syncField('f-sport', s);
+}
+function pickSport2(s) {
+  $('sc2-futsal').classList.toggle('sel', s==='futsal');
+  $('sc2-football').classList.toggle('sel', s==='football');
+  syncField('f-sport', s);
+}
+
+// ── Smart defaults for step 2 ──────────────────────────────────
+function applySmartDefaults() {
+  var def = FMT_DEF[curFmt];
+  var teams = parseInt(($('v2-teams') || {value:String(def.teams)}).value) || def.teams;
+  syncField('f-fmt',  curFmt);
+  syncField('f-type', FMT_TYPE[curFmt]);
+  syncField('f-teams', teams);
+  syncField('f-hg', def.hasG ? 'has_groups' : '');
+  syncField('f-hk', def.hasK ? 'has_knockout' : '');
+  if (def.hasG) {
+    syncField('f-groups', def.groups);
+    syncField('f-qpg',    def.qpg);
+    syncField('f-tpg',    Math.round(teams / def.groups));
+    setPhaseFlags(calcPhases(def.groups * def.qpg));
+  } else if (def.hasK) {
+    setPhaseFlags(calcPhases(teams));
+  } else {
+    syncField('f-hr16',''); syncField('f-hqf',''); syncField('f-hsf',''); syncField('f-hfin','has_final');
+  }
+  // Update badge
+  var b = $('s2-badge'); if (b) b.textContent = FMT_LABELS[curFmt];
+  // Update info
+  var info = $('s2-info');
+  if (info) {
+    var phases = def.hasK ? calcPhases(def.hasG ? def.groups*def.qpg : teams) : [];
+    var msg = '';
+    if (def.hasG) msg += def.groups + ' grupos × ' + def.qpg + ' qualificam. ';
+    if (phases.length) msg += 'Bracket: ' + phases.map(function(p){return p.l}).join(' → ') + '.';
+    if (!def.hasG && !def.hasK) msg = 'Liga round-robin — todos contra todos.';
+    info.textContent = msg;
+  }
+}
+
+// ── Preview panel ──────────────────────────────────────────────
+function updatePrev() {
+  var pn = $('prev-name'); if (pn) pn.textContent = ($('v-name')||{value:''}).value || ($('v2-name')||{value:''}).value || 'Nome do Torneio';
+  var pd = $('prev-date'); if (pd) pd.textContent = ($('v-date')||{value:''}).value || ($('v2-date')||{value:''}).value || '—';
+  var pt = $('prev-teams'); if (pt) pt.textContent = ($('v-teams')||{value:'8'}).value;
+  var pb = $('prev-badge'); if (pb) pb.textContent = FMT_LABELS[curFmt];
+  var pf = $('prev-fmt');   if (pf) pf.textContent = FMT_FMT[curFmt];
+}
+
+// ── Logo preview ───────────────────────────────────────────────
+document.getElementById('f-logo').addEventListener('change', function() {
+  var file = this.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    $('logo-prev').innerHTML = '<img src="' + e.target.result + '" style="max-width:100px;max-height:70px;border-radius:6px;border:2px solid var(--neon);object-fit:contain;" />';
+  };
+  reader.readAsDataURL(file);
+});
+
+// ── Drag & drop logo ───────────────────────────────────────────
+var dz = $('dzone');
+if (dz) {
+  dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('dov'); });
+  dz.addEventListener('dragleave', function() { dz.classList.remove('dov'); });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault(); dz.classList.remove('dov');
+    var file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      var dt = new DataTransfer(); dt.items.add(file);
+      $('f-logo').files = dt.files;
+      $('f-logo').dispatchEvent(new Event('change'));
+    }
+  });
+}
+
+// ── Form submit validation ─────────────────────────────────────
+function prepareSubmit() {
+  // Apply smart defaults for step 2
+  if (curStep === 2) applySmartDefaults();
+  // Validate required fields
+  var name = $('f-name').value.trim();
+  var date = $('f-date').value.trim();
+  if (!name) {
+    var inp = curStep === 1 ? $('v-name') : $('v2-name');
+    if (inp) { inp.focus(); inp.style.borderColor = 'var(--danger)'; }
+    alert('Preenche o nome do torneio.');
+    return false;
+  }
+  if (!date) {
+    var dinp = curStep === 1 ? $('v-date') : $('v2-date');
+    if (dinp) { dinp.focus(); dinp.style.borderColor = 'var(--danger)'; }
+    alert('Preenche a data de início.');
+    return false;
+  }
+  return true;
+}
+
+// ── Init ───────────────────────────────────────────────────────
+pickFmt('campeonato');
+updatePrev();
+</script>
+{% endblock %}

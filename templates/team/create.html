@@ -1,0 +1,238 @@
+﻿{% extends 'base.html' %}
+{% block title %}Nova Equipa — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">⚽ Nova Equipa</div>
+    <div class="page-subtitle">Regista todos os dados do clube no sistema.</div>
+  </div>
+  <a href="{{ url_for('team.list_teams') }}" class="btn btn-secondary">← Voltar</a>
+</div>
+
+<form method="POST" action="{{ url_for('team.create_team') }}" id="team-form">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px;">
+
+  <!-- ─── Coluna Esquerda ─────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- Identidade -->
+    <div class="card">
+      <div class="card-title">🏟️ Identidade do Clube</div>
+      <div class="form-group">
+        <label class="form-label">Nome da Equipa *</label>
+        <input type="text" name="name" class="form-control" placeholder="Ex: FC Austin" required autofocus />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Abreviatura</label>
+          <input type="text" name="short_name" class="form-control" placeholder="Ex: FCA" maxlength="5" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modalidade</label>
+          <select name="sport" class="form-control" id="sport-select" onchange="updateFormations()">
+            <option value="futsal">⚽ Futsal</option>
+            <option value="futebol11">🏟️ Futebol 11</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data de Fundação</label>
+          <input type="date" name="founded_date" class="form-control" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cidade</label>
+          <input type="text" name="city" class="form-control" placeholder="Ex: Lisboa" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">País</label>
+          <input type="text" name="country" class="form-control" value="Portugal" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pavilhão / Campo</label>
+          <input type="text" name="stadium" class="form-control" placeholder="Nome do recinto" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cor Principal</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="color" name="primary_color" value="#2563eb"
+                   style="width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer;" />
+            <input type="text" id="primary_hex" class="form-control" value="#2563eb"
+                   style="font-family: monospace;" maxlength="7"
+                   oninput="document.querySelector('[name=primary_color]').value=this.value" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cor Secundária</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="color" name="secondary_color" value="#ffffff"
+                   style="width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer;" />
+            <input type="text" id="secondary_hex" class="form-control" value="#ffffff"
+                   style="font-family: monospace;" maxlength="7"
+                   oninput="document.querySelector('[name=secondary_color]').value=this.value" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contacto -->
+    <div class="card">
+      <div class="card-title">📞 Contactos</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" placeholder="clube@email.com" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" name="phone" class="form-control" placeholder="+351 912 345 678" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Website</label>
+          <input type="url" name="website" class="form-control" placeholder="https://..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instagram</label>
+          <input type="text" name="instagram" class="form-control" placeholder="@nomedoclube" />
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ─── Coluna Direita ──────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- Direcção -->
+    <div class="card">
+      <div class="card-title">👔 Direcção & Equipa Técnica</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">CEO / Presidente</label>
+          <input type="text" name="ceo" class="form-control" placeholder="Nome do presidente" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Diretor Desportivo</label>
+          <input type="text" name="manager" class="form-control" placeholder="Nome do diretor" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Treinador Principal</label>
+          <input type="text" name="coach" class="form-control" placeholder="Nome do treinador" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Treinador Adjunto</label>
+          <input type="text" name="assistant_coach" class="form-control" placeholder="Nome do adjunto" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Capitão</label>
+        <input type="text" name="captain" class="form-control" placeholder="Nome do capitão" />
+      </div>
+    </div>
+
+    <!-- Jogo -->
+    <div class="card">
+      <div class="card-title">🎮 Sistema de Jogo</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Formação</label>
+          <select name="formation" class="form-control" id="formation-select">
+            <optgroup label="Futsal" id="futsal-formations">
+              {% for f in formations_futsal %}
+              <option value="{{ f }}">{{ f }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Futebol 11" id="football-formations" style="display:none">
+              {% for f in formations_football %}
+              <option value="{{ f }}">{{ f }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tática / Estilo</label>
+          <input type="text" name="tactic" class="form-control" placeholder="Ex: Pressão alta, Posse de bola..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- Notas -->
+    <div class="card">
+      <div class="card-title">📝 Notas Internas</div>
+      <div class="form-group">
+        <textarea name="notes" class="form-control" rows="4"
+                  placeholder="Informações adicionais sobre a equipa..."></textarea>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="card" id="team-preview" style="border-color: var(--neon); text-align: center; padding: 24px;">
+      <div class="card-title">👁️ Preview</div>
+      <div id="preview-avatar" style="width: 64px; height: 64px; border-radius: 50%;
+           background: #2563eb; display: flex; align-items: center; justify-content: center;
+           font-size: 1.4rem; font-weight: 900; color: white; margin: 0 auto 12px;">FC</div>
+      <div id="preview-name" style="font-size: 1.1rem; font-weight: 800;">Nome da Equipa</div>
+      <div id="preview-sub" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Futsal</div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top: 24px; display: flex; gap: 12px; max-width: 1000px;">
+  <button type="submit" class="btn btn-primary" style="padding: 12px 32px; font-size: 1rem;">
+    ⚽ Criar Equipa
+  </button>
+  <a href="{{ url_for('team.list_teams') }}" class="btn btn-secondary">Cancelar</a>
+</div>
+</form>
+
+<script>
+// Live preview
+const nameInput = document.querySelector('[name=name]');
+const sportSelect = document.getElementById('sport-select');
+const primaryColor = document.querySelector('[name=primary_color]');
+const secondaryColor = document.querySelector('[name=secondary_color]');
+
+function updatePreview() {
+  const name = nameInput.value || 'Nome da Equipa';
+  const words = name.trim().split(' ');
+  const initials = words.length >= 2
+    ? (words[0][0] + words[words.length-1][0]).toUpperCase()
+    : name.substring(0, 2).toUpperCase();
+
+  document.getElementById('preview-name').textContent = name;
+  document.getElementById('preview-avatar').textContent = initials;
+  document.getElementById('preview-avatar').style.background = primaryColor.value;
+  document.getElementById('preview-avatar').style.color = secondaryColor.value;
+  document.getElementById('preview-sub').textContent =
+    sportSelect.value === 'futsal' ? '⚽ Futsal' : '🏟️ Futebol 11';
+}
+
+nameInput.addEventListener('input', updatePreview);
+sportSelect.addEventListener('change', updatePreview);
+primaryColor.addEventListener('input', function() {
+  document.getElementById('primary_hex').value = this.value;
+  updatePreview();
+});
+secondaryColor.addEventListener('input', function() {
+  document.getElementById('secondary_hex').value = this.value;
+  updatePreview();
+});
+
+function updateFormations() {
+  const sport = document.getElementById('sport-select').value;
+  document.getElementById('futsal-formations').style.display = sport === 'futsal' ? '' : 'none';
+  document.getElementById('football-formations').style.display = sport === 'futebol11' ? '' : 'none';
+  updatePreview();
+}
+</script>
+{% endblock %}

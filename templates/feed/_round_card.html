@@ -1,0 +1,81 @@
+{# Card de resultados de uma jornada completa — estilo Girabola #}
+{% if post.tournament and post.title and 'Jornada' in post.title %}
+{% set round_matches = [] %}
+{% if post.tournament %}
+  {% set round_num = post.title.split(' ')[1] | int(0) %}
+  {% if round_num > 0 %}
+    {# Fetch matches for this round via content parsing #}
+  {% endif %}
+{% endif %}
+
+<div style="
+  background: linear-gradient(160deg, #0d1526 0%, #111d35 100%);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(37,99,235,0.25);
+  margin-top: 12px;
+">
+  <!-- Header estilo Girabola -->
+  <div style="
+    background: linear-gradient(90deg, rgba(37,99,235,0.15), rgba(6,182,212,0.1));
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(37,99,235,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  ">
+    {% if post.tournament.logo_url %}
+    <img src="{{ url_for('static', filename=post.tournament.logo_url) }}"
+         style="width:32px;height:32px;border-radius:6px;object-fit:cover;" />
+    {% endif %}
+    <div style="text-align:center;">
+      <div style="font-size:1.1rem;font-weight:900;color:#f59e0b;letter-spacing:0.05em;text-transform:uppercase;
+                  text-shadow:0 0 20px rgba(245,158,11,0.4);">
+        {{ post.title }}
+      </div>
+      <div style="font-size:0.65rem;color:#4b6080;letter-spacing:0.12em;text-transform:uppercase;margin-top:2px;">
+        {{ post.tournament.name }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Results list -->
+  <div style="padding:8px 0;">
+    {% for line in post.content.split('\n') %}
+    {% if '–' in line or '-' in line %}
+    <div style="
+      display:flex;align-items:center;justify-content:center;
+      padding:10px 20px;
+      border-bottom:1px solid rgba(30,58,95,0.3);
+      gap:8px;
+    ">
+      <span style="font-size:0.85rem;font-weight:700;color:#f0f4ff;flex:1;text-align:right;">
+        {{ line.split('–')[0].replace('🏆','').replace('🤝','').strip() if '–' in line else line.split('-')[0].strip() }}
+      </span>
+      <span style="font-size:1rem;font-weight:900;color:#3b82f6;min-width:60px;text-align:center;letter-spacing:0.05em;">
+        {% if '–' in line %}
+          {{ line.split('–')[0].strip().split(' ')[-1] if line.split('–')[0].strip().split(' ')[-1].isdigit() else '' }}
+          –
+          {{ line.split('–')[1].strip().split(' ')[0] if line.split('–')[1].strip().split(' ')[0].isdigit() else '' }}
+        {% endif %}
+      </span>
+      <span style="font-size:0.85rem;font-weight:700;color:#f0f4ff;flex:1;text-align:left;">
+        {{ line.split('–')[1].strip() if '–' in line else '' }}
+      </span>
+    </div>
+    {% elif line.startswith('📅') %}
+    <div style="text-align:center;font-size:0.7rem;color:#4b6080;padding:6px 0;">{{ line }}</div>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:10px 20px;text-align:center;border-top:1px solid rgba(30,58,95,0.3);">
+    <a href="{{ url_for('tournament.jornadas', tournament_id=post.tournament_id) }}"
+       style="font-size:0.72rem;color:#3b82f6;text-decoration:none;font-weight:600;">
+      📋 Ver Jornada Completa →
+    </a>
+  </div>
+</div>
+{% endif %}

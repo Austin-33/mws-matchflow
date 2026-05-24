@@ -1,0 +1,530 @@
+<!-- ═══════════════════════════════════════════════════════════
+     AUSTIN LEAGUE CORE — Campo Tático Interativo
+     Drag & Drop estilo FIFA/Dream League Soccer
+═══════════════════════════════════════════════════════════ -->
+
+<!-- Dados dos jogadores para o JS -->
+<script>
+const TEAM_COLOR_PRIMARY   = "{{ team.primary_color or '#2563eb' }}";
+const TEAM_COLOR_SECONDARY = "{{ team.secondary_color or '#ffffff' }}";
+const TEAM_FORMATION       = "{{ team.formation or '1-2-1' }}";
+const TEAM_ID              = {{ team.id }};
+
+const ALL_PLAYERS = [
+  {% for p in players %}
+  {
+    id: {{ p.id }},
+    name: "{{ p.display_name | replace('"', '\\"') }}",
+    number: {{ p.number or 0 }},
+    position: "{{ p.position or '' }}",
+    status: "{{ p.status }}",
+    photo: "{{ url_for('static', filename=p.photo_url) if p.photo_url else '' }}"
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+];
+</script>
+
+<!-- ─── Tab: Line-up ─────────────────────────────────────────── -->
+<div id="lineup" class="tab-content" style="display:none;">
+
+  <!-- Top bar -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+    <div style="font-size:0.85rem;color:var(--text-muted);">Formação:</div>
+    <select id="formation-picker" class="form-control" style="width:auto;"
+            onchange="applyFormation(this.value)">
+      {% set formations_futsal = ['1-2-1','1-3','2-2','3-1','4-0'] %}
+      {% set formations_football = ['4-3-3','4-4-2','4-2-3-1','3-5-2','5-3-2','3-4-3','4-1-4-1'] %}
+      {% for f in formations_futsal + formations_football %}
+      <option value="{{ f }}" {{ 'selected' if team.formation == f }}>{{ f }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-secondary btn-sm" onclick="autoFill()">🎲 Auto-preencher</button>
+    <button class="btn btn-primary btn-sm" onclick="saveLineup()">💾 Guardar</button>
+    <button class="btn btn-secondary btn-sm" onclick="clearField()">🗑️ Limpar</button>
+    <span id="save-status" style="font-size:0.8rem;color:var(--success);display:none;">✅ Guardado!</span>
+  </div>
+
+  <!-- Main layout: Field + Bench -->
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+
+    <!-- ─── CAMPO ──────────────────────────────────────────── -->
+    <div id="pitch-container" style="flex:1;min-width:320px;max-width:560px;">
+      <div id="pitch"
+           style="position:relative;width:100%;padding-bottom:140%;
+                  background:
+                    linear-gradient(180deg,
+                      #1a4a1a 0%, #1e5a1e 8%, #1a4a1a 16%,
+                      #1e5a1e 24%, #1a4a1a 32%, #1e5a1e 40%,
+                      #1a4a1a 48%, #1e5a1e 56%, #1a4a1a 64%,
+                      #1e5a1e 72%, #1a4a1a 80%, #1e5a1e 88%, #1a4a1a 100%);
+                  border-radius:12px;
+                  border:3px solid #2d7a2d;
+                  overflow:hidden;
+                  box-shadow:0 0 40px rgba(0,100,0,0.4);"
+           ondragover="event.preventDefault()"
+           ondrop="dropOnPitch(event)">
+
+        <!-- Field markings SVG -->
+        <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;"
+             viewBox="0 0 100 140" preserveAspectRatio="none">
+          <!-- Outer border -->
+          <rect x="3" y="3" width="94" height="134" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+          <!-- Centre line -->
+          <line x1="3" y1="70" x2="97" y2="70" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+          <!-- Centre circle -->
+          <circle cx="50" cy="70" r="12" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
+          <circle cx="50" cy="70" r="0.8" fill="rgba(255,255,255,0.4)"/>
+          <!-- Top penalty area -->
+          <rect x="22" y="3" width="56" height="20" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+          <rect x="35" y="3" width="30" height="10" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+          <circle cx="50" cy="16" r="0.8" fill="rgba(255,255,255,0.4)"/>
+          <!-- Bottom penalty area -->
+          <rect x="22" y="117" width="56" height="20" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+          <rect x="35" y="127" width="30" height="10" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
+          <circle cx="50" cy="124" r="0.8" fill="rgba(255,255,255,0.4)"/>
+          <!-- Goals -->
+          <rect x="40" y="0" width="20" height="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="0.4"/>
+          <rect x="40" y="137" width="20" height="3" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.3)" stroke-width="0.4"/>
+        </svg>
+
+        <!-- Player slots — rendered by JS -->
+        <div id="field-slots" style="position:absolute;top:0;left:0;width:100%;height:100%;"></div>
+
+      </div>
+    </div>
+
+    <!-- ─── BANCO ──────────────────────────────────────────── -->
+    <div style="width:200px;flex-shrink:0;">
+      <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;
+                  color:var(--text-muted);margin-bottom:10px;">
+        🪑 Banco ({{ players|length }} jogadores)
+      </div>
+      <div id="bench"
+           style="background:var(--bg-secondary);border:2px dashed var(--border);border-radius:12px;
+                  padding:10px;min-height:400px;display:flex;flex-direction:column;gap:8px;"
+           ondragover="event.preventDefault()"
+           ondrop="dropOnBench(event)">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Hidden form to save -->
+  <form id="lineup-form" method="POST" action="/teams/{{ team.id }}/lineup/save" style="display:none;">
+    <input type="hidden" name="formation" id="form-formation" />
+    <input type="hidden" name="lineup_data" id="form-lineup-data" />
+  </form>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT — Campo Tático Interativo
+═══════════════════════════════════════════════════════════ -->
+<script>
+// ─── State ────────────────────────────────────────────────────
+// fieldSlots: { slotId: { x, y, label } }
+// assignments: { slotId: playerId | null }
+// benchPlayers: [playerId, ...]
+
+const FORMATIONS = {
+  // Futsal
+  '1-2-1': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'def1',label:'DEF',   x:30, y:65},
+    {id:'def2',label:'DEF',   x:70, y:65},
+    {id:'mid1',label:'MID',   x:50, y:42},
+    {id:'fwd1',label:'ATK',   x:50, y:18},
+  ],
+  '1-3': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'mid1',label:'MID',   x:25, y:50},
+    {id:'mid2',label:'MID',   x:50, y:50},
+    {id:'mid3',label:'MID',   x:75, y:50},
+    {id:'fwd1',label:'ATK',   x:50, y:18},
+  ],
+  '2-2': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'def1',label:'DEF',   x:30, y:68},
+    {id:'def2',label:'DEF',   x:70, y:68},
+    {id:'mid1',label:'MID',   x:30, y:38},
+    {id:'mid2',label:'MID',   x:70, y:38},
+    {id:'fwd1',label:'ATK',   x:50, y:15},
+  ],
+  '3-1': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'def1',label:'DEF',   x:20, y:62},
+    {id:'def2',label:'DEF',   x:50, y:62},
+    {id:'def3',label:'DEF',   x:80, y:62},
+    {id:'mid1',label:'MID',   x:50, y:38},
+    {id:'fwd1',label:'ATK',   x:50, y:15},
+  ],
+  '4-0': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'out1',label:'OUT',   x:15, y:50},
+    {id:'out2',label:'OUT',   x:38, y:50},
+    {id:'out3',label:'OUT',   x:62, y:50},
+    {id:'out4',label:'OUT',   x:85, y:50},
+    {id:'fwd1',label:'ATK',   x:50, y:18},
+  ],
+  // Football
+  '4-3-3': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'rb',  label:'DD',    x:80, y:72},{id:'cb1',label:'DC',x:62,y:75},
+    {id:'cb2', label:'DC',    x:38, y:75},{id:'lb', label:'DE',x:20,y:72},
+    {id:'cm1', label:'MC',    x:25, y:52},{id:'cm2',label:'MC',x:50,y:50},
+    {id:'cm3', label:'MC',    x:75, y:52},
+    {id:'rw',  label:'ED',    x:78, y:28},{id:'st', label:'CA',x:50,y:20},
+    {id:'lw',  label:'EE',    x:22, y:28},
+  ],
+  '4-4-2': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'rb',  label:'DD',    x:80, y:72},{id:'cb1',label:'DC',x:62,y:75},
+    {id:'cb2', label:'DC',    x:38, y:75},{id:'lb', label:'DE',x:20,y:72},
+    {id:'rm',  label:'MD',    x:80, y:50},{id:'cm1',label:'MC',x:60,y:52},
+    {id:'cm2', label:'MC',    x:40, y:52},{id:'lm', label:'ME',x:20,y:50},
+    {id:'st1', label:'CA',    x:35, y:22},{id:'st2',label:'CA',x:65,y:22},
+  ],
+  '4-2-3-1': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'rb',  label:'DD',    x:80, y:72},{id:'cb1',label:'DC',x:62,y:75},
+    {id:'cb2', label:'DC',    x:38, y:75},{id:'lb', label:'DE',x:20,y:72},
+    {id:'dm1', label:'MDC',   x:38, y:58},{id:'dm2',label:'MDC',x:62,y:58},
+    {id:'rw',  label:'MO',    x:75, y:38},{id:'cam',label:'MO',x:50,y:35},
+    {id:'lw',  label:'MO',    x:25, y:38},
+    {id:'st',  label:'CA',    x:50, y:18},
+  ],
+  '3-5-2': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'cb1', label:'DC',    x:25, y:74},{id:'cb2',label:'DC',x:50,y:76},
+    {id:'cb3', label:'DC',    x:75, y:74},
+    {id:'rm',  label:'MD',    x:85, y:52},{id:'cm1',label:'MC',x:65,y:52},
+    {id:'cm2', label:'MC',    x:50, y:50},{id:'cm3',label:'MC',x:35,y:52},
+    {id:'lm',  label:'ME',    x:15, y:52},
+    {id:'st1', label:'CA',    x:35, y:22},{id:'st2',label:'CA',x:65,y:22},
+  ],
+  '5-3-2': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'rb',  label:'DD',    x:88, y:68},{id:'cb1',label:'DC',x:70,y:74},
+    {id:'cb2', label:'DC',    x:50, y:76},{id:'cb3',label:'DC',x:30,y:74},
+    {id:'lb',  label:'DE',    x:12, y:68},
+    {id:'cm1', label:'MC',    x:25, y:48},{id:'cm2',label:'MC',x:50,y:46},
+    {id:'cm3', label:'MC',    x:75, y:48},
+    {id:'st1', label:'CA',    x:35, y:22},{id:'st2',label:'CA',x:65,y:22},
+  ],
+  '3-4-3': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'cb1', label:'DC',    x:25, y:74},{id:'cb2',label:'DC',x:50,y:76},
+    {id:'cb3', label:'DC',    x:75, y:74},
+    {id:'rm',  label:'MD',    x:80, y:52},{id:'cm1',label:'MC',x:58,y:52},
+    {id:'cm2', label:'MC',    x:42, y:52},{id:'lm', label:'ME',x:20,y:52},
+    {id:'rw',  label:'ED',    x:75, y:25},{id:'st', label:'CA',x:50,y:20},
+    {id:'lw',  label:'EE',    x:25, y:25},
+  ],
+  '4-1-4-1': [
+    {id:'gk',  label:'GR',    x:50, y:88},
+    {id:'rb',  label:'DD',    x:80, y:72},{id:'cb1',label:'DC',x:62,y:75},
+    {id:'cb2', label:'DC',    x:38, y:75},{id:'lb', label:'DE',x:20,y:72},
+    {id:'dm',  label:'MDC',   x:50, y:60},
+    {id:'rm',  label:'MD',    x:80, y:44},{id:'cm1',label:'MC',x:60,y:46},
+    {id:'cm2', label:'MC',    x:40, y:46},{id:'lm', label:'ME',x:20,y:44},
+    {id:'st',  label:'CA',    x:50, y:20},
+  ],
+};
+
+// ─── Runtime state ────────────────────────────────────────────
+let currentFormation = TEAM_FORMATION;
+let slots = [];           // [{id, label, x, y}]
+let assignments = {};     // slotId → playerId
+let dragSource = null;    // {type:'slot'|'bench', id:slotId|playerId}
+let selectedSlot = null;  // slotId of first click (for swap)
+
+// ─── Init ─────────────────────────────────────────────────────
+function init() {
+  applyFormation(currentFormation, false);
+  renderBench();
+}
+
+// ─── Apply formation ──────────────────────────────────────────
+function applyFormation(formation, clearAssignments = true) {
+  currentFormation = formation;
+  document.getElementById('formation-picker').value = formation;
+  slots = FORMATIONS[formation] || FORMATIONS['1-2-1'];
+  if (clearAssignments) assignments = {};
+  renderField();
+  renderBench();
+}
+
+// ─── Render field ─────────────────────────────────────────────
+function renderField() {
+  const container = document.getElementById('field-slots');
+  container.innerHTML = '';
+
+  slots.forEach(slot => {
+    const pid = assignments[slot.id];
+    const player = pid ? ALL_PLAYERS.find(p => p.id === pid) : null;
+
+    const el = document.createElement('div');
+    el.id = `slot-${slot.id}`;
+    el.dataset.slotId = slot.id;
+    el.style.cssText = `
+      position:absolute;
+      left:${slot.x}%;top:${slot.y}%;
+      transform:translate(-50%,-50%);
+      width:64px;
+      cursor:pointer;
+      text-align:center;
+      z-index:10;
+      transition:transform 0.15s;
+    `;
+    el.draggable = true;
+
+    if (player) {
+      el.innerHTML = playerCard(player, slot.label);
+    } else {
+      el.innerHTML = emptySlot(slot.label);
+    }
+
+    // Events
+    el.addEventListener('dragstart', e => onDragStart(e, 'slot', slot.id));
+    el.addEventListener('dragover',  e => { e.preventDefault(); el.style.transform='translate(-50%,-50%) scale(1.1)'; });
+    el.addEventListener('dragleave', e => { el.style.transform='translate(-50%,-50%)'; });
+    el.addEventListener('drop',      e => onDropSlot(e, slot.id));
+    el.addEventListener('click',     e => onClickSlot(slot.id));
+
+    container.appendChild(el);
+  });
+}
+
+// ─── Player card HTML ─────────────────────────────────────────
+function playerCard(player, posLabel) {
+  const bg = TEAM_COLOR_PRIMARY;
+  const fg = TEAM_COLOR_SECONDARY;
+  const photo = player.photo
+    ? `<img src="${player.photo}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:2px solid ${fg};margin-bottom:2px;" />`
+    : `<div style="width:36px;height:36px;border-radius:50%;background:${fg};color:${bg};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9rem;margin:0 auto 2px;">${player.name[0]}</div>`;
+
+  return `
+    <div style="background:linear-gradient(160deg,${bg}ee,${bg}cc);
+         border:2px solid ${fg}55;border-radius:10px;padding:6px 4px;
+         box-shadow:0 4px 12px rgba(0,0,0,0.5);
+         transition:all 0.15s;">
+      ${photo}
+      <div style="font-size:0.65rem;font-weight:800;color:${fg};line-height:1.1;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">
+        ${player.number ? player.number + '. ' : ''}${player.name.split(' ').pop()}
+      </div>
+      <div style="font-size:0.55rem;color:${fg}99;font-weight:700;letter-spacing:0.05em;">
+        ${player.position || posLabel}
+      </div>
+    </div>`;
+}
+
+// ─── Empty slot HTML ──────────────────────────────────────────
+function emptySlot(label) {
+  return `
+    <div style="width:56px;height:72px;border:2px dashed rgba(255,255,255,0.25);
+         border-radius:10px;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;background:rgba(0,0,0,0.2);transition:all 0.15s;">
+      <div style="font-size:1.2rem;opacity:0.4;">+</div>
+      <div style="font-size:0.55rem;color:rgba(255,255,255,0.4);font-weight:700;">${label}</div>
+    </div>`;
+}
+
+// ─── Render bench ─────────────────────────────────────────────
+function renderBench() {
+  const bench = document.getElementById('bench');
+  bench.innerHTML = '';
+
+  const onField = new Set(Object.values(assignments).filter(Boolean));
+  const benchPlayers = ALL_PLAYERS.filter(p => !onField.has(p.id));
+
+  if (benchPlayers.length === 0) {
+    bench.innerHTML = '<div style="color:var(--text-muted);font-size:0.8rem;text-align:center;padding:20px;">Todos no campo</div>';
+    return;
+  }
+
+  benchPlayers.forEach(player => {
+    const card = document.createElement('div');
+    card.id = `bench-${player.id}`;
+    card.dataset.playerId = player.id;
+    card.draggable = true;
+    card.style.cssText = `
+      display:flex;align-items:center;gap:8px;
+      padding:8px 10px;
+      background:var(--bg-card);
+      border:1px solid var(--border);
+      border-radius:8px;
+      cursor:grab;
+      transition:all 0.15s;
+    `;
+
+    const photo = player.photo
+      ? `<img src="${player.photo}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+      : `<div style="width:32px;height:32px;border-radius:50%;background:${TEAM_COLOR_PRIMARY};color:${TEAM_COLOR_SECONDARY};display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.8rem;flex-shrink:0;">${player.name[0]}</div>`;
+
+    card.innerHTML = `
+      ${photo}
+      <div style="overflow:hidden;">
+        <div style="font-size:0.78rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+          ${player.number ? player.number + '. ' : ''}${player.name}
+        </div>
+        <div style="font-size:0.62rem;color:var(--text-muted);">${player.position || '—'}</div>
+      </div>`;
+
+    card.addEventListener('dragstart', e => onDragStart(e, 'bench', player.id));
+    card.addEventListener('click', () => onClickBench(player.id));
+    card.addEventListener('mouseover', () => card.style.borderColor = 'var(--neon)');
+    card.addEventListener('mouseout',  () => card.style.borderColor = 'var(--border)');
+
+    bench.appendChild(card);
+  });
+}
+
+// ─── Drag & Drop ──────────────────────────────────────────────
+function onDragStart(e, type, id) {
+  dragSource = { type, id };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', JSON.stringify(dragSource));
+}
+
+function onDropSlot(e, targetSlotId) {
+  e.preventDefault();
+  e.stopPropagation();
+  resetSlotStyles();
+
+  if (!dragSource) return;
+
+  if (dragSource.type === 'bench') {
+    // Bench player → slot
+    const existingPid = assignments[targetSlotId];
+    assignments[targetSlotId] = dragSource.id;
+    // If slot had a player, they go back to bench (handled by renderBench)
+    renderField();
+    renderBench();
+
+  } else if (dragSource.type === 'slot') {
+    // Slot → Slot (swap)
+    const srcSlotId = dragSource.id;
+    const srcPid = assignments[srcSlotId];
+    const tgtPid = assignments[targetSlotId];
+    assignments[targetSlotId] = srcPid || null;
+    assignments[srcSlotId] = tgtPid || null;
+    renderField();
+    renderBench();
+  }
+
+  dragSource = null;
+  selectedSlot = null;
+}
+
+function dropOnPitch(e) {
+  e.preventDefault();
+  // Dropped on pitch background — ignore (handled by slot drops)
+}
+
+function dropOnBench(e) {
+  e.preventDefault();
+  if (!dragSource || dragSource.type !== 'slot') return;
+
+  // Remove player from slot → goes to bench
+  const slotId = dragSource.id;
+  assignments[slotId] = null;
+  dragSource = null;
+  selectedSlot = null;
+  renderField();
+  renderBench();
+}
+
+function resetSlotStyles() {
+  document.querySelectorAll('[id^="slot-"]').forEach(el => {
+    el.style.transform = 'translate(-50%,-50%)';
+  });
+}
+
+// ─── Click to swap ────────────────────────────────────────────
+function onClickSlot(slotId) {
+  if (selectedSlot === null) {
+    // First click — select
+    selectedSlot = slotId;
+    const el = document.getElementById(`slot-${slotId}`);
+    if (el) el.style.transform = 'translate(-50%,-50%) scale(1.15)';
+    el.querySelector('div').style.boxShadow = '0 0 0 3px var(--neon-glow)';
+  } else if (selectedSlot === slotId) {
+    // Click same — deselect
+    clearSelection();
+  } else {
+    // Second click — swap
+    const pid1 = assignments[selectedSlot];
+    const pid2 = assignments[slotId];
+    assignments[slotId] = pid1 || null;
+    assignments[selectedSlot] = pid2 || null;
+    selectedSlot = null;
+    renderField();
+    renderBench();
+  }
+}
+
+function onClickBench(playerId) {
+  if (selectedSlot !== null) {
+    // Place bench player into selected slot
+    const existingPid = assignments[selectedSlot];
+    assignments[selectedSlot] = playerId;
+    selectedSlot = null;
+    renderField();
+    renderBench();
+  }
+}
+
+function clearSelection() {
+  selectedSlot = null;
+  renderField();
+}
+
+// ─── Auto-fill ────────────────────────────────────────────────
+function autoFill() {
+  assignments = {};
+  const active = ALL_PLAYERS.filter(p => p.status === 'ativo');
+  const shuffled = [...active].sort(() => Math.random() - 0.5);
+  slots.forEach((slot, i) => {
+    if (shuffled[i]) assignments[slot.id] = shuffled[i].id;
+  });
+  renderField();
+  renderBench();
+}
+
+// ─── Clear field ──────────────────────────────────────────────
+function clearField() {
+  assignments = {};
+  renderField();
+  renderBench();
+}
+
+// ─── Save lineup ──────────────────────────────────────────────
+function saveLineup() {
+  const data = {
+    formation: currentFormation,
+    starters: Object.entries(assignments)
+      .filter(([, pid]) => pid)
+      .map(([slotId, pid]) => ({ slot: slotId, player_id: pid }))
+  };
+
+  fetch(`/teams/${TEAM_ID}/lineup/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) {
+      const status = document.getElementById('save-status');
+      status.style.display = 'inline';
+      setTimeout(() => status.style.display = 'none', 2500);
+    }
+  })
+  .catch(() => alert('Erro ao guardar.'));
+}
+
+// ─── Start ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', init);
+</script>

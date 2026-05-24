@@ -1,0 +1,334 @@
+{# ═══════════════════════════════════════════════════════════
+   AUSTIN LEAGUE CORE — Feed Post Card (Modern UI)
+   Inclui: resultado visual, comentários, reações, pin
+═══════════════════════════════════════════════════════════ #}
+
+<article class="feed-card {% if post.is_pinned %}feed-card--pinned{% endif %}"
+         id="post-{{ post.id }}"
+         style="
+           background:var(--bg-card);
+           border:1px solid {% if post.is_pinned %}rgba(245,158,11,0.4){% elif post.post_type=='result' %}rgba(16,185,129,0.25){% else %}var(--border){% endif %};
+           border-radius:16px;
+           margin-bottom:16px;
+           overflow:hidden;
+           transition:box-shadow 0.2s;
+         ">
+
+  <!-- ─── Top accent line ──────────────────────────────────── -->
+  <div style="height:3px;background:{% if post.post_type=='result' %}linear-gradient(90deg,#10b981,#06b6d4){% elif post.post_type=='announce' %}linear-gradient(90deg,#2563eb,#8b5cf6){% elif post.post_type=='highlight' %}linear-gradient(90deg,#f59e0b,#ef4444){% else %}linear-gradient(90deg,#1e3a5f,#2563eb){% endif %};"></div>
+
+  <div style="padding:16px 18px;">
+
+    <!-- ─── Header ─────────────────────────────────────────── -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <!-- Author avatar -->
+        <div style="width:38px;height:38px;border-radius:50%;flex-shrink:0;
+             background:{% if post.post_type=='result' %}linear-gradient(135deg,#10b981,#06b6d4){% elif post.post_type=='announce' %}linear-gradient(135deg,#2563eb,#8b5cf6){% else %}linear-gradient(135deg,#1e3a5f,#2563eb){% endif %};
+             display:flex;align-items:center;justify-content:center;
+             font-size:1rem;font-weight:900;color:white;">
+          {{ post.type_icon }}
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-size:0.78rem;font-weight:800;
+                         color:{% if post.post_type=='result' %}#10b981{% elif post.post_type=='announce' %}var(--neon-glow){% elif post.post_type=='highlight' %}#f59e0b{% else %}var(--accent2){% endif %};">
+              {{ post.type_label | upper }}
+            </span>
+            {% if post.is_pinned %}
+            <span style="font-size:0.6rem;background:rgba(245,158,11,0.15);color:#f59e0b;
+                         padding:1px 6px;border-radius:4px;border:1px solid rgba(245,158,11,0.3);">📌 FIXADO</span>
+            {% endif %}
+            {% if post.tournament %}
+            <a href="{{ url_for('tournament.tournament_room', tournament_id=post.tournament_id) }}"
+               style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;
+                      background:var(--bg-primary);padding:1px 7px;border-radius:4px;
+                      border:1px solid var(--border);">
+              🏆 {{ post.tournament.name }}
+            </a>
+            {% endif %}
+          </div>
+          <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px;">
+            {% if post.author %}
+            <span style="font-weight:600;color:var(--text-secondary);">{{ post.author.display_name }}</span> ·
+            {% endif %}
+            {{ post.created_at.strftime('%d/%m/%Y %H:%M') if post.created_at else '' }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions menu -->
+      {% if current_user.role in ['admin','manager'] or post.author_id == current_user.id %}
+      <div style="display:flex;gap:4px;flex-shrink:0;">
+        <button onclick="togglePin({{ post.id }}, this)"
+                title="{{ 'Desafixar' if post.is_pinned else 'Fixar no topo' }}"
+                style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;
+                       color:{% if post.is_pinned %}#f59e0b{% else %}var(--text-muted){% endif %};
+                       font-size:0.85rem;transition:0.15s;"
+                onmouseover="this.style.background='var(--bg-primary)'"
+                onmouseout="this.style.background='none'">📌</button>
+        <form method="POST" action="{{ url_for('feed.delete_post', post_id=post.id) }}"
+              onsubmit="return confirm('Remover publicação?')" style="margin:0;">
+          <input type="hidden" name="next" value="{{ request.url }}" />
+          <button type="submit"
+                  style="background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:6px;
+                         color:var(--text-muted);font-size:0.85rem;transition:0.15s;"
+                  onmouseover="this.style.color='var(--danger)';this.style.background='rgba(239,68,68,0.08)'"
+                  onmouseout="this.style.color='var(--text-muted)';this.style.background='none'">✕</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ─── Title ───────────────────────────────────────────── -->
+    {% if post.title %}
+    <div style="font-size:{% if post.post_type=='result' %}1.05rem{% else %}0.95rem{% endif %};
+                font-weight:800;color:var(--text-primary);margin-bottom:8px;line-height:1.3;">
+      {{ post.title }}
+    </div>
+    {% endif %}
+
+    <!-- ─── Result card visual (single match) ──────────────── -->
+    {% if post.post_type == 'result' and post.match_id and post.match %}
+    {% include 'feed/_result_card.html' %}
+
+    <!-- ─── Round results card (jornada completa) ──────────── -->
+    {% elif post.post_type == 'result' and not post.match_id and post.tournament_id %}
+    {% include 'feed/_round_card.html' %}
+
+    <!-- ─── Regular content ────────────────────────────────── -->
+    {% else %}
+    {% if post.content %}
+    <div style="font-size:0.875rem;color:var(--text-secondary);line-height:1.7;
+                white-space:pre-wrap;margin-bottom:{% if post.image_url %}0{% else %}4px{% endif %};">{{ post.content }}</div>
+    {% endif %}
+    {% endif %}
+
+    <!-- ─── Image ──────────────────────────────────────────── -->
+    {% if post.image_url %}
+    <img src="{{ url_for('static', filename=post.image_url) }}"
+         style="width:100%;max-height:360px;object-fit:cover;border-radius:10px;
+                margin-top:12px;border:1px solid var(--border);" />
+    {% endif %}
+
+    <!-- ─── Tagged teams ───────────────────────────────────── -->
+    {% if post.tagged_teams %}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+      {% for ft in post.tagged_teams %}
+      <a href="{{ url_for('team.team_room', team_id=ft.team_id) }}"
+         style="display:flex;align-items:center;gap:5px;font-size:0.7rem;
+                background:rgba(37,99,235,0.07);color:var(--neon-glow);
+                padding:3px 9px;border-radius:20px;text-decoration:none;
+                border:1px solid rgba(37,99,235,0.2);transition:0.15s;"
+         onmouseover="this.style.background='rgba(37,99,235,0.15)'"
+         onmouseout="this.style.background='rgba(37,99,235,0.07)'">
+        <div style="width:12px;height:12px;border-radius:50%;
+             background:{{ ft.team.primary_color or '#2563eb' }};flex-shrink:0;"></div>
+        {{ ft.team.name }}
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- ─── Action bar ─────────────────────────────────────── -->
+    <div style="display:flex;align-items:center;gap:0;margin-top:14px;
+                padding-top:12px;border-top:1px solid rgba(30,58,95,0.4);">
+      <!-- Comment toggle -->
+      <button onclick="toggleComments({{ post.id }})"
+              style="display:flex;align-items:center;gap:6px;background:none;border:none;
+                     cursor:pointer;padding:6px 12px;border-radius:8px;
+                     color:var(--text-muted);font-size:0.8rem;font-weight:600;transition:0.15s;"
+              onmouseover="this.style.background='var(--bg-primary)';this.style.color='var(--text-primary)'"
+              onmouseout="this.style.background='none';this.style.color='var(--text-muted)'">
+        💬 <span id="comment-count-{{ post.id }}">{{ post.comments | length }}</span>
+        {{ 'comentário' if post.comments | length == 1 else 'comentários' }}
+      </button>
+
+      {% if post.match_id %}
+      <a href="{{ url_for('match.match_detail', match_id=post.match_id) }}"
+         style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;
+                color:var(--text-muted);font-size:0.8rem;font-weight:600;text-decoration:none;
+                transition:0.15s;margin-left:4px;"
+         onmouseover="this.style.background='var(--bg-primary)';this.style.color='var(--neon-glow)'"
+         onmouseout="this.style.background='none';this.style.color='var(--text-muted)'">
+        📊 Ver Jogo
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- ─── Comments section ───────────────────────────────── -->
+    <div id="comments-{{ post.id }}" style="display:none;margin-top:12px;">
+
+      <!-- Existing comments -->
+      <div id="comments-list-{{ post.id }}">
+        {% for c in post.comments %}
+        <div class="comment-item" id="comment-{{ c.id }}"
+             style="display:flex;gap:10px;padding:8px 0;border-top:1px solid rgba(30,58,95,0.3);">
+          <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;
+               background:linear-gradient(135deg,var(--neon),var(--accent));
+               display:flex;align-items:center;justify-content:center;
+               font-size:0.75rem;font-weight:900;color:white;">
+            {{ c.author.display_name[0].upper() if c.author else '?' }}
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+              <span style="font-size:0.8rem;font-weight:700;color:var(--text-primary);">
+                {{ c.author.display_name if c.author else 'Utilizador' }}
+              </span>
+              <span style="font-size:0.68rem;color:var(--text-muted);">
+                {{ c.created_at.strftime('%d/%m %H:%M') if c.created_at else '' }}
+              </span>
+              {% if current_user.id == c.author_id or current_user.role in ['admin','manager'] %}
+              <button onclick="deleteComment({{ c.id }})"
+                      style="background:none;border:none;cursor:pointer;color:var(--text-muted);
+                             font-size:0.7rem;padding:0;margin-left:auto;transition:0.15s;"
+                      onmouseover="this.style.color='var(--danger)'"
+                      onmouseout="this.style.color='var(--text-muted)'">✕</button>
+              {% endif %}
+            </div>
+            <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:2px;line-height:1.5;">
+              {{ c.content }}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- New comment input -->
+      <div style="display:flex;gap:8px;margin-top:10px;padding-top:10px;
+                  border-top:1px solid rgba(30,58,95,0.3);">
+        <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;
+             background:linear-gradient(135deg,var(--neon),var(--accent));
+             display:flex;align-items:center;justify-content:center;
+             font-size:0.75rem;font-weight:900;color:white;">
+          {{ current_user.display_name[0].upper() }}
+        </div>
+        <div style="flex:1;display:flex;gap:8px;">
+          <input type="text"
+                 id="comment-input-{{ post.id }}"
+                 placeholder="Escreve um comentário..."
+                 style="flex:1;background:var(--bg-primary);border:1px solid var(--border);
+                        border-radius:20px;padding:7px 14px;color:var(--text-primary);
+                        font-size:0.82rem;outline:none;transition:0.2s;"
+                 onfocus="this.style.borderColor='var(--neon)'"
+                 onblur="this.style.borderColor='var(--border)'"
+                 onkeydown="if(event.key==='Enter')submitComment({{ post.id }})" />
+          <button onclick="submitComment({{ post.id }})"
+                  style="background:var(--neon);border:none;cursor:pointer;
+                         width:34px;height:34px;border-radius:50%;
+                         display:flex;align-items:center;justify-content:center;
+                         font-size:0.9rem;transition:0.15s;flex-shrink:0;"
+                  onmouseover="this.style.background='var(--neon-glow)'"
+                  onmouseout="this.style.background='var(--neon)'">➤</button>
+        </div>
+      </div>
+
+    </div><!-- end comments section -->
+
+  </div><!-- end padding -->
+</article>
+
+<script>
+// ─── Toggle comments ──────────────────────────────────────────
+function toggleComments(postId) {
+  const section = document.getElementById('comments-' + postId);
+  const isHidden = section.style.display === 'none';
+  section.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    const input = document.getElementById('comment-input-' + postId);
+    if (input) setTimeout(() => input.focus(), 100);
+  }
+}
+
+// ─── Submit comment ───────────────────────────────────────────
+function submitComment(postId) {
+  const input = document.getElementById('comment-input-' + postId);
+  const content = input.value.trim();
+  if (!content) return;
+
+  input.disabled = true;
+
+  fetch('/feed/' + postId + '/comment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content })
+  })
+  .then(r => r.json())
+  .then(data => {
+    input.disabled = false;
+    if (!data.ok) { alert(data.error || 'Erro'); return; }
+
+    input.value = '';
+    const c = data.comment;
+    const list = document.getElementById('comments-list-' + postId);
+
+    const div = document.createElement('div');
+    div.id = 'comment-' + c.id;
+    div.className = 'comment-item';
+    div.style.cssText = 'display:flex;gap:10px;padding:8px 0;border-top:1px solid rgba(30,58,95,0.3);';
+    div.innerHTML = `
+      <div style="width:30px;height:30px;border-radius:50%;flex-shrink:0;
+           background:linear-gradient(135deg,var(--neon),var(--accent));
+           display:flex;align-items:center;justify-content:center;
+           font-size:0.75rem;font-weight:900;color:white;">${c.author_initial}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--text-primary);">${c.author}</span>
+          <span style="font-size:0.68rem;color:var(--text-muted);">${c.created_at}</span>
+          <button onclick="deleteComment(${c.id})"
+                  style="background:none;border:none;cursor:pointer;color:var(--text-muted);
+                         font-size:0.7rem;padding:0;margin-left:auto;"
+                  onmouseover="this.style.color='var(--danger)'"
+                  onmouseout="this.style.color='var(--text-muted)'">✕</button>
+        </div>
+        <div style="font-size:0.82rem;color:var(--text-secondary);margin-top:2px;line-height:1.5;">${c.content}</div>
+      </div>`;
+    list.appendChild(div);
+
+    // Update count
+    const countEl = document.getElementById('comment-count-' + postId);
+    if (countEl) countEl.textContent = parseInt(countEl.textContent || 0) + 1;
+  })
+  .catch(() => { input.disabled = false; alert('Erro de ligação.'); });
+}
+
+// ─── Delete comment ───────────────────────────────────────────
+function deleteComment(commentId) {
+  if (!confirm('Remover comentário?')) return;
+  fetch('/feed/comment/' + commentId + '/delete', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const el = document.getElementById('comment-' + commentId);
+        if (el) {
+          // Find post id from parent
+          const section = el.closest('[id^="comments-list-"]');
+          if (section) {
+            const postId = section.id.replace('comments-list-', '');
+            const countEl = document.getElementById('comment-count-' + postId);
+            if (countEl) countEl.textContent = Math.max(0, parseInt(countEl.textContent) - 1);
+          }
+          el.style.opacity = '0';
+          el.style.transition = '0.3s';
+          setTimeout(() => el.remove(), 300);
+        }
+      }
+    });
+}
+
+// ─── Pin toggle ───────────────────────────────────────────────
+function togglePin(postId, btn) {
+  fetch('/feed/' + postId + '/pin', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        btn.style.color = d.pinned ? '#f59e0b' : 'var(--text-muted)';
+        btn.title = d.pinned ? 'Desafixar' : 'Fixar no topo';
+        const card = document.getElementById('post-' + postId);
+        if (card) {
+          card.style.borderColor = d.pinned ? 'rgba(245,158,11,0.4)' : 'var(--border)';
+        }
+      }
+    });
+}
+</script>

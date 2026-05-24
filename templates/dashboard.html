@@ -1,0 +1,118 @@
+﻿{% extends 'base.html' %}
+{% block title %}Dashboard — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Dashboard <span>⚡</span></div>
+    <div class="page-subtitle">Bem-vindo, {{ current_user.username }}. Aqui está o teu centro de controlo.</div>
+  </div>
+  <a href="{{ url_for('tournament.create_tournament') }}" class="btn btn-primary">
+    🚀 Novo Torneio
+  </a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-icon">🏆</div>
+    <div class="stat-value">{{ tournaments | length }}</div>
+    <div class="stat-label">Campeonatos</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🧑‍🤝‍🧑</div>
+    <div class="stat-value">{{ teams | length }}</div>
+    <div class="stat-label">Equipas</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📅</div>
+    <div class="stat-value">{{ matches_today | length }}</div>
+    <div class="stat-label">Jogos Hoje</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value">{{ tournaments | selectattr('status', 'equalto', 'active') | list | length }}</div>
+    <div class="stat-label">Ativos</div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- Campeonatos Recentes -->
+  <div>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <h2 style="font-size: 1rem; font-weight: 700;">🏆 Campeonatos Recentes</h2>
+      <a href="{{ url_for('tournament.list_tournaments') }}" class="btn btn-secondary btn-sm">Ver todos</a>
+    </div>
+
+    {% if tournaments %}
+      {% for t in tournaments[:4] %}
+      <a href="{{ url_for('tournament.tournament_room', tournament_id=t.id) }}" class="tournament-card" style="margin-bottom: 12px;">
+        <div class="tournament-card-header">
+          <div>
+            <div class="tournament-name">{{ t.name }}</div>
+            <div class="tournament-type">
+              {% if t.type == 'liga' %}⚽ Liga
+              {% elif t.type == 'grupos_eliminatoria' %}🏟️ Grupos + Mata-mata
+              {% else %}⚔️ Eliminatória{% endif %}
+            </div>
+          </div>
+          <span class="badge badge-{{ t.status }}">
+            {% if t.status == 'active' %}Ativo
+            {% elif t.status == 'finished' %}Terminado
+            {% else %}Pendente{% endif %}
+          </span>
+        </div>
+        <div class="tournament-card-footer">
+          <span>👥 {{ t.teams_count }} equipas</span>
+          <span>📆 {{ t.start_date }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">🏆</div>
+        <p>Nenhum campeonato criado ainda.</p>
+        <a href="{{ url_for('tournament.create_tournament') }}" class="btn btn-primary">Criar primeiro torneio</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Jogos de Hoje -->
+  <div>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <h2 style="font-size: 1rem; font-weight: 700;">📅 Jogos de Hoje</h2>
+      <a href="{{ url_for('match.list_matches') }}" class="btn btn-secondary btn-sm">Ver todos</a>
+    </div>
+
+    {% if matches_today %}
+      {% for m in matches_today %}
+      <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom: 10px;">
+        <div class="match-team">
+          <div class="team-name">{{ m.team1.name }}</div>
+        </div>
+        <div class="match-score">
+          <div class="score-display">{{ m.score_display }}</div>
+          <div class="match-meta">
+            <span class="badge badge-{{ m.status }}">
+              {% if m.status == 'finished' %}FT
+              {% elif m.status == 'live' %}🔴 AO VIVO
+              {% else %}{{ m.time }}{% endif %}
+            </span>
+          </div>
+        </div>
+        <div class="match-team right">
+          <div class="team-name">{{ m.team2.name }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    {% else %}
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <p>Sem jogos agendados para hoje.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

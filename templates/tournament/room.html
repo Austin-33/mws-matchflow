@@ -1,0 +1,434 @@
+﻿{% extends 'base.html' %}
+{% block title %}{{ tournament.name }} — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:16px;">
+    {% if tournament.logo_url %}
+    <img src="{{ url_for('static', filename=tournament.logo_url) }}"
+         style="width:56px;height:56px;border-radius:10px;object-fit:contain;background:var(--bg-secondary);padding:4px;border:2px solid var(--border);" />
+    {% else %}
+    <div style="width:56px;height:56px;border-radius:10px;background:var(--neon);
+         display:flex;align-items:center;justify-content:center;font-size:1.6rem;">🏆</div>
+    {% endif %}
+    <div>
+      <div class="page-title">{{ tournament.name }}</div>
+      <div class="page-subtitle">
+        {{ tournament.sport_label }} ·
+        {% if tournament.type=='liga' %}⚽ Liga{% elif tournament.type=='grupos_eliminatoria' %}🏟️ Grupos+Mata-mata{% else %}⚔️ Eliminatória{% endif %}
+        · Início: {{ tournament.start_date }}
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    {% if tournament.status == 'pending' %}
+    <span class="badge badge-pending">⏳ Inscrições Abertas</span>
+    {% elif tournament.status == 'active' %}
+    <span class="badge badge-active">🟢 Ativo</span>
+    {% else %}
+    <span class="badge badge-finished">⬛ Terminado</span>
+    {% endif %}
+    <a href="{{ url_for('tournament.list_tournaments') }}" class="btn btn-secondary btn-sm">← Voltar</a>
+    <a href="{{ url_for('finance.finance', tid=tournament.id) }}" class="btn btn-secondary btn-sm">💰 Finanças</a>
+    <form method="POST" action="{{ url_for('tournament.delete_tournament', tournament_id=tournament.id) }}"
+          onsubmit="return confirm('Eliminar torneio?')">
+      <button class="btn btn-danger btn-sm">🗑️</button>
+    </form>
+  </div>
+</div>
+
+<!-- Stats rápidas -->
+<div class="stats-grid" style="margin-bottom:20px;">
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value">{{ standings|length }}</div>
+    <div class="stat-label">Equipas{% if tournament.teams_count %}/{{ tournament.teams_count }}{% endif %}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📅</div>
+    <div class="stat-value">{{ (group_matches + knockout_matches)|length }}</div>
+    <div class="stat-label">Jogos</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">✅</div>
+    <div class="stat-value">{{ (group_matches + knockout_matches)|selectattr('status','equalto','finished')|list|length }}</div>
+    <div class="stat-label">Realizados</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">⏳</div>
+    <div class="stat-value">{{ next_matches|length }}</div>
+    <div class="stat-label">Próximos</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <a href="#tabela" class="tab-btn active" onclick="showTab('tabela',this)">📊 Tabela</a>
+  <a href="#calendario" class="tab-btn" onclick="showTab('calendario',this)">📅 Calendário</a>
+  {% if groups %}<a href="#grupos" class="tab-btn" onclick="showTab('grupos',this)">🔠 Grupos</a>{% endif %}
+  {% if knockout_matches %}<a href="#knockout" class="tab-btn" onclick="showTab('knockout',this)">⚔️ Mata-mata</a>{% endif %}
+  <a href="#inscricoes" class="tab-btn" onclick="showTab('inscricoes',this)">🧑‍🤝‍🧑 Inscrições</a>
+  <a href="#scorers" class="tab-btn" onclick="showTab('scorers',this)">⚽ Marcadores</a>
+  <a href="#feed" class="tab-btn" onclick="showTab('feed',this)">📰 Feed</a>
+  <a href="{{ url_for('tournament.jornadas', tournament_id=tournament.id) }}"
+     class="tab-btn" style="text-decoration:none;">📋 Jornadas</a>
+  <a href="{{ url_for('tournament.bracket', tournament_id=tournament.id) }}"
+     class="tab-btn" style="text-decoration:none;">⚔️ Bracket</a>
+</div>
+
+<!-- ─── Tab: Tabela ─────────────────────────────────────────── -->
+<div id="tabela" class="tab-content">
+  {% if standings %}
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Equipa</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GM</th><th>GS</th><th>DG</th><th>Pts</th></tr></thead>
+      <tbody>
+        {% for tt in standings %}
+        <tr>
+          <td><span style="font-weight:700;color:{% if loop.index==1 %}#f59e0b{% elif loop.index==2 %}#94a3b8{% elif loop.index==3 %}#b45309{% else %}var(--text-muted){% endif %}">{{ loop.index }}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px;">
+              {% if tt.team.logo_url %}
+              <img src="{{ url_for('static', filename=tt.team.logo_url) }}" style="width:24px;height:24px;border-radius:50%;object-fit:contain;" />
+              {% else %}
+              <div style="width:24px;height:24px;border-radius:50%;background:{{ tt.team.primary_color or '#2563eb' }};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:900;color:{{ tt.team.secondary_color or '#fff' }};">{{ tt.team.initials }}</div>
+              {% endif %}
+              <a href="{{ url_for('team.team_room', team_id=tt.team_id) }}" style="color:var(--text-primary);text-decoration:none;font-weight:600;">{{ tt.team.name }}</a>
+            </div>
+          </td>
+          <td>{{ tt.played }}</td>
+          <td style="color:var(--success);">{{ tt.wins }}</td>
+          <td>{{ tt.draws }}</td>
+          <td style="color:var(--danger);">{{ tt.losses }}</td>
+          <td>{{ tt.goals_for }}</td>
+          <td>{{ tt.goals_against }}</td>
+          <td style="color:{% if tt.goal_diff>0 %}var(--success){% elif tt.goal_diff<0 %}var(--danger){% else %}var(--text-muted){% endif %}">{{ '+' if tt.goal_diff>0 else '' }}{{ tt.goal_diff }}</td>
+          <td style="font-weight:800;color:var(--neon-glow);font-size:1rem;">{{ tt.points }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📊</div><p>Nenhuma equipa inscrita ainda.</p></div>
+  {% endif %}
+</div>
+
+<!-- ─── Tab: Calendário ─────────────────────────────────────── -->
+<div id="calendario" class="tab-content" style="display:none;">
+
+  {% if tournament.status == 'pending' %}
+  <div class="card" style="border-color:rgba(245,158,11,0.4);margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:12px;color:var(--warning);">
+      <span style="font-size:1.5rem;">⏳</span>
+      <div>
+        <div style="font-weight:700;">Inscrições Abertas</div>
+        <div style="font-size:0.85rem;color:var(--text-muted);">
+          O calendário será gerado após o fecho das inscrições.
+          {% if tournament.teams_count %}
+          ({{ standings|length }}/{{ tournament.teams_count }} equipas inscritas)
+          {% endif %}
+        </div>
+      </div>
+      {% if standings|length >= 2 %}
+      <form method="POST" action="{{ url_for('tournament.generate_calendar', tournament_id=tournament.id) }}" style="margin-left:auto;">
+        <button class="btn btn-primary btn-sm">⚡ Gerar Calendário Agora</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if group_matches %}
+    {% set ns = namespace(cur_round=0, cur_group='') %}
+    {% for m in group_matches %}
+      {% if m.round_number != ns.cur_round or m.group_letter != ns.cur_group %}
+        {% if ns.cur_round != 0 %}</div>{% endif %}
+        {% set ns.cur_round = m.round_number %}
+        {% set ns.cur_group = m.group_letter %}
+        <div style="margin:20px 0 8px;">
+          <span style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);">
+            {% if m.group_letter %}Grupo {{ m.group_letter }} — {% endif %}Jornada {{ m.round_number }}
+          </span>
+        </div>
+        <div>
+      {% endif %}
+      <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom:8px;">
+        <div class="match-team">
+          {% if m.team1.logo_url %}<img src="{{ url_for('static', filename=m.team1.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-right:8px;" />{% endif %}
+          <div class="team-name">{{ m.team1.name }}</div>
+        </div>
+        <div class="match-score">
+          <div class="score-display">{{ m.score_display }}</div>
+          <div class="match-meta">
+            <span class="badge badge-{{ m.status }}">
+              {% if m.status=='finished' %}FT{% elif m.status=='live' %}🔴 AO VIVO{% else %}{{ m.date }}{% endif %}
+            </span>
+          </div>
+          {% if m.status == 'scheduled' %}
+          <a href="{{ url_for('match.match_play', match_id=m.id) }}" class="btn btn-primary btn-sm" style="margin-top:4px;font-size:0.65rem;padding:3px 8px;" onclick="event.stopPropagation()">▶ Match Play</a>
+          {% endif %}
+        </div>
+        <div class="match-team right">
+          <div class="team-name">{{ m.team2.name }}</div>
+          {% if m.team2.logo_url %}<img src="{{ url_for('static', filename=m.team2.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-left:8px;" />{% endif %}
+        </div>
+      </a>
+    {% endfor %}
+    </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">📅</div><p>Nenhum jogo gerado ainda.</p></div>
+  {% endif %}
+</div>
+
+<!-- ─── Tab: Grupos ─────────────────────────────────────────── -->
+{% if groups %}
+<div id="grupos" class="tab-content" style="display:none;">
+
+  <!-- Assign groups buttons -->
+  <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <a href="{{ url_for('tournament.draw_groups', tournament_id=tournament.id) }}"
+       class="btn btn-primary btn-sm">
+      🎲 Sorteio de Grupos (Drag &amp; Drop)
+    </a>
+    <form method="POST" action="{{ url_for('tournament.assign_groups', tournament_id=tournament.id) }}">
+      <input type="hidden" name="mode" value="random" />
+      <button class="btn btn-secondary btn-sm">🔀 Redistribuir Aleatoriamente</button>
+    </form>
+    <span style="font-size:0.78rem;color:var(--text-muted);">
+      {{ tournament.groups_count or 0 }} grupos ·
+      {{ tournament.teams_per_group or '?' }} equipas/grupo ·
+      {{ tournament.qualify_per_group or '?' }} qualificam
+    </span>
+  </div>
+
+  <div class="grid-2">
+    {% for group in groups %}
+    <div class="card">
+      <div class="card-title" style="font-size:1rem;color:var(--neon-glow);">Grupo {{ group.name }}</div>
+      <div class="table-wrapper" style="border:none;">
+        <table>
+          <thead><tr><th>Equipa</th><th>J</th><th>V</th><th>E</th><th>D</th><th>GM</th><th>GS</th><th>Pts</th></tr></thead>
+          <tbody>
+            {% for tt in group.group_teams|sort(attribute='points',reverse=True) %}
+            <tr>
+              <td>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  {% if tt.team.logo_url %}
+                  <img src="{{ url_for('static', filename=tt.team.logo_url) }}" style="width:20px;height:20px;border-radius:50%;object-fit:contain;" />
+                  {% else %}
+                  <div style="width:20px;height:20px;border-radius:50%;background:{{ tt.team.primary_color or '#2563eb' }};display:flex;align-items:center;justify-content:center;font-size:0.5rem;font-weight:900;color:white;">{{ tt.team.initials }}</div>
+                  {% endif %}
+                  <a href="{{ url_for('team.team_room', team_id=tt.team_id) }}" style="color:var(--text-primary);text-decoration:none;">{{ tt.team.name }}</a>
+                </div>
+              </td>
+              <td>{{ tt.played }}</td><td style="color:var(--success);">{{ tt.wins }}</td>
+              <td>{{ tt.draws }}</td><td style="color:var(--danger);">{{ tt.losses }}</td>
+              <td>{{ tt.goals_for }}</td><td>{{ tt.goals_against }}</td>
+              <td style="font-weight:800;color:var(--neon-glow);">{{ tt.points }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" style="color:var(--text-muted);font-style:italic;text-align:center;padding:12px;">
+              (Equipa em espera para o registo)
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ─── Tab: Mata-mata ──────────────────────────────────────── -->
+{% if knockout_matches %}
+<div id="knockout" class="tab-content" style="display:none;">
+  {% set phases_order = [('round_of_16','⚔️ Oitavos de Final'),('quarter','⚔️ Quartos de Final'),('semi','🔥 Meia-Final'),('final','🏆 FINAL')] %}
+  {% for phase_key, phase_label in phases_order %}
+    {% set phase_matches = knockout_matches|selectattr('phase','equalto',phase_key)|list %}
+    {% if phase_matches %}
+    <div style="margin-bottom:28px;">
+      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px;">{{ phase_label }}</div>
+      {% for m in phase_matches %}
+      <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom:8px;">
+        <div class="match-team">
+          {% if m.team1.logo_url %}<img src="{{ url_for('static', filename=m.team1.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-right:8px;" />{% endif %}
+          <div class="team-name">{{ m.team1.name }}</div>
+        </div>
+        <div class="match-score">
+          <div class="score-display">{{ m.score_display }}</div>
+          <div class="match-meta"><span class="badge badge-{{ m.status }}">{% if m.status=='finished' %}FT{% elif m.status=='live' %}🔴{% else %}{{ m.date }}{% endif %}</span></div>
+        </div>
+        <div class="match-team right">
+          <div class="team-name">{{ m.team2.name }}</div>
+          {% if m.team2.logo_url %}<img src="{{ url_for('static', filename=m.team2.logo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:contain;margin-left:8px;" />{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- ─── Tab: Inscrições ─────────────────────────────────────── -->
+<div id="inscricoes" class="tab-content" style="display:none;">
+  <div class="grid-2">
+
+    <!-- Equipas inscritas -->
+    <div class="card">
+      <div class="card-title">✅ Equipas Inscritas ({{ standings|length }}{% if tournament.teams_count %}/{{ tournament.teams_count }}{% endif %})</div>
+      {% if standings %}
+      {% for tt in standings %}
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        {% if tt.team.logo_url %}
+        <img src="{{ url_for('static', filename=tt.team.logo_url) }}" style="width:32px;height:32px;border-radius:50%;object-fit:contain;" />
+        {% else %}
+        <div style="width:32px;height:32px;border-radius:50%;background:{{ tt.team.primary_color or '#2563eb' }};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:900;color:white;">{{ tt.team.initials }}</div>
+        {% endif %}
+        <a href="{{ url_for('team.team_room', team_id=tt.team_id) }}" style="font-weight:600;color:var(--text-primary);text-decoration:none;">{{ tt.team.name }}</a>
+        {% if tt.group_letter %}<span class="badge badge-active" style="margin-left:auto;">Grupo {{ tt.group_letter }}</span>{% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="color:var(--text-muted);font-size:0.85rem;padding:12px 0;">
+        (Esperando candidatura das equipas)
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Inscrever equipa -->
+    {% if tournament.status == 'pending' or tournament.status == 'active' %}
+    <div class="card">
+      <div class="card-title">➕ Inscrever Equipa</div>
+      {% if available_teams %}
+      <form method="POST" action="{{ url_for('tournament.register_team', tournament_id=tournament.id) }}">
+        <div class="form-group">
+          <label class="form-label">Selecionar Equipa</label>
+          <select name="team_id" class="form-control">
+            <option value="">Escolher...</option>
+            {% for t in available_teams %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">✅ Inscrever</button>
+      </form>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:0.85rem;">Todas as equipas já estão inscritas.</div>
+      {% endif %}
+
+      {% if standings|length >= 2 and tournament.status == 'pending' %}
+      <hr class="divider" />
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px;">Quando as inscrições estiverem completas:</div>
+      <form method="POST" action="{{ url_for('tournament.generate_calendar', tournament_id=tournament.id) }}">
+        <button class="btn btn-primary">⚡ Fechar Inscrições e Gerar Calendário</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- ─── Tab: Marcadores ─────────────────────────────────────── -->
+<div id="scorers" class="tab-content" style="display:none;">
+  {% if top_scorers %}
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>#</th><th>Jogador</th><th>Equipa</th><th>⚽ Golos</th><th>🎯 Assist.</th><th>🟨</th><th>🟥</th><th>Jogos</th></tr></thead>
+      <tbody>
+        {% for p in top_scorers %}
+        <tr>
+          <td><span style="font-weight:800;color:{% if loop.index==1 %}#f59e0b{% elif loop.index==2 %}#94a3b8{% elif loop.index==3 %}#b45309{% else %}var(--text-muted){% endif %}">{% if loop.index==1 %}🥇{% elif loop.index==2 %}🥈{% elif loop.index==3 %}🥉{% else %}{{ loop.index }}{% endif %}</span></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              {% if p.photo_url %}<img src="{{ url_for('static', filename=p.photo_url) }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" />{% endif %}
+              <span style="font-weight:600;">{{ p.display_name }}</span>
+            </div>
+          </td>
+          <td><a href="{{ url_for('team.team_room', team_id=p.team_id) }}" style="color:var(--neon-glow);text-decoration:none;">{{ p.team.name }}</a></td>
+          <td style="font-weight:800;color:var(--success);font-size:1.1rem;">{{ p.goals }}</td>
+          <td style="font-weight:700;color:var(--accent);">{{ p.assists }}</td>
+          <td style="color:#f59e0b;">{{ p.yellow_cards }}</td>
+          <td style="color:var(--danger);">{{ p.red_cards }}</td>
+          <td>{{ p.matches_played }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="empty-icon">⚽</div><p>Sem estatísticas ainda.</p></div>
+  {% endif %}
+</div>
+
+<!-- ─── Tab: Feed do Campeonato ─────────────────────────────── -->
+<div id="feed" class="tab-content" style="display:none;">
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:20px;align-items:start;">
+    <div>
+      {% if current_user.role in ['admin','manager'] %}
+      <div class="card" style="margin-bottom:16px;border-color:var(--neon);">
+        <div class="card-title">✏️ Publicar no Feed do Campeonato</div>
+        <form method="POST" action="{{ url_for('feed.create_post') }}" enctype="multipart/form-data">
+          <input type="hidden" name="next" value="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}#feed" />
+          <input type="hidden" name="tournament_id" value="{{ tournament.id }}" />
+          <input type="hidden" name="scope" value="tournament" />
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+            <select name="post_type" class="form-control" style="width:auto;">
+              <option value="announce">📢 Anúncio</option>
+              <option value="news">📰 Notícia</option>
+              <option value="highlight">⭐ Destaque</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <input type="text" name="title" class="form-control" placeholder="Título (opcional)" style="margin-bottom:8px;" />
+            <textarea name="content" class="form-control" rows="3" placeholder="Conteúdo..." required></textarea>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">📢 Publicar</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {% if tournament_feed %}
+      {% for post in tournament_feed %}
+      {% include 'feed/_post_card.html' %}
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="empty-icon">📰</div>
+        <p>Nenhuma publicação ainda. Os resultados dos jogos aparecem aqui automaticamente.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Mini sidebar -->
+    <div class="card" style="position:sticky;top:20px;">
+      <div class="card-title">🏆 Últimos Resultados</div>
+      {% set results = tournament_feed | selectattr('post_type','equalto','result') | list %}
+      {% if results %}
+      {% for p in results[:5] %}
+      <div style="padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--neon-glow);">{{ p.title }}</div>
+        <div style="font-size:0.68rem;color:var(--text-muted);">
+          {{ p.created_at.strftime('%d/%m/%Y') if p.created_at else '' }}
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="font-size:0.82rem;color:var(--text-muted);">Sem resultados ainda.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).style.display = 'block';
+  if (btn) btn.classList.add('active');
+  return false;
+}
+</script>
+{% endblock %}

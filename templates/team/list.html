@@ -1,0 +1,120 @@
+﻿{% extends 'base.html' %}
+{% block title %}Equipas — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">🧑‍🤝‍🧑 Equipas</div>
+    <div class="page-subtitle">{{ teams | length }} equipa{{ 's' if teams | length != 1 }} registada{{ 's' if teams | length != 1 }}.</div>
+  </div>
+  <a href="{{ url_for('team.create_team') }}" class="btn btn-primary">+ Nova Equipa</a>
+</div>
+
+<!-- Filtros -->
+<form method="GET" style="margin-bottom: 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end;">
+  <div>
+    <label class="form-label">Pesquisar</label>
+    <input type="text" name="q" value="{{ search }}" class="form-control"
+           placeholder="🔍 Nome da equipa..." style="width: 220px;" />
+  </div>
+  <div>
+    <label class="form-label">Modalidade</label>
+    <select name="sport" class="form-control" style="width: auto;">
+      <option value="">Todas</option>
+      <option value="futsal" {{ 'selected' if sport_filter == 'futsal' }}>⚽ Futsal</option>
+      <option value="futebol11" {{ 'selected' if sport_filter == 'futebol11' }}>🏟️ Futebol 11</option>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-secondary btn-sm">Filtrar</button>
+  {% if search or sport_filter %}
+  <a href="{{ url_for('team.list_teams') }}" class="btn btn-secondary btn-sm">✕ Limpar</a>
+  {% endif %}
+</form>
+
+{% if teams %}
+<div class="grid-auto">
+  {% for team in teams %}
+  <a href="{{ url_for('team.team_room', team_id=team.id) }}" class="team-card" style="text-decoration: none;">
+
+    <!-- Avatar com cor da equipa -->
+    <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+           background: {{ team.primary_color or '#2563eb' }};
+           display: flex; align-items: center; justify-content: center;
+           font-size: 1rem; font-weight: 900; color: {{ team.secondary_color or '#ffffff' }};
+           border: 2px solid var(--border);">
+        {{ team.initials }}
+      </div>
+      <div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">
+          {{ team.name }}
+          {% if team.short_name %}
+          <span style="font-size: 0.65rem; color: var(--text-muted); margin-left: 4px;">({{ team.short_name }})</span>
+          {% endif %}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">
+          {{ '⚽ Futsal' if team.sport == 'futsal' else '🏟️ Futebol 11' }}
+          {% if team.city %} · 📍 {{ team.city }}{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Info rápida -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 12px;">
+      {% if team.ceo %}
+      <div style="font-size: 0.72rem; color: var(--text-muted);">
+        👑 <span style="color: var(--text-secondary);">{{ team.ceo }}</span>
+      </div>
+      {% endif %}
+      {% if team.coach %}
+      <div style="font-size: 0.72rem; color: var(--text-muted);">
+        👔 <span style="color: var(--text-secondary);">{{ team.coach }}</span>
+      </div>
+      {% endif %}
+      {% if team.captain %}
+      <div style="font-size: 0.72rem; color: var(--text-muted);">
+        ⭐ <span style="color: var(--text-secondary);">{{ team.captain }}</span>
+      </div>
+      {% endif %}
+      {% if team.founded_date %}
+      <div style="font-size: 0.72rem; color: var(--text-muted);">
+        📅 <span style="color: var(--text-secondary);">{{ team.founded_date }}</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tags -->
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+      {% if team.formation %}
+      <span style="font-size: 0.68rem; background: rgba(37,99,235,0.1); color: var(--neon-glow);
+                   padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(37,99,235,0.2); font-weight: 600;">
+        {{ team.formation }}
+      </span>
+      {% endif %}
+      {% if team.tactic %}
+      <span style="font-size: 0.68rem; background: rgba(6,182,212,0.1); color: var(--accent);
+                   padding: 2px 8px; border-radius: 4px; border: 1px solid rgba(6,182,212,0.2);">
+        {{ team.tactic | truncate(20, true, '...') }}
+      </span>
+      {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div style="padding-top: 10px; border-top: 1px solid var(--border);
+                font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+      <span>👥 {{ team.players | length }} jogadores</span>
+      {% if team.stadium %}
+      <span>🏟️ {{ team.stadium | truncate(18, true, '...') }}</span>
+      {% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🧑‍🤝‍🧑</div>
+  <p>{% if search or sport_filter %}Nenhuma equipa encontrada.{% else %}Nenhuma equipa criada ainda.{% endif %}</p>
+  <a href="{{ url_for('team.create_team') }}" class="btn btn-primary">+ Criar Primeira Equipa</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,415 @@
+{% extends 'base.html' %}
+{% block title %}Feed — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<style>
+/* ─── Feed Modern UI ─────────────────────────────────────────── */
+.feed-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 24px;
+  align-items: start;
+}
+.feed-compose {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  transition: border-color 0.2s;
+}
+.feed-compose:focus-within {
+  border-color: var(--neon);
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.08);
+}
+.compose-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.compose-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--neon), var(--accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: white;
+  flex-shrink: 0;
+}
+.compose-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.compose-meta select {
+  font-size: 0.75rem;
+  padding: 5px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+  transition: 0.15s;
+}
+.compose-meta select:focus { border-color: var(--neon); }
+.compose-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: none;
+  font-family: inherit;
+  min-height: 60px;
+}
+.compose-textarea::placeholder { color: var(--text-muted); }
+.compose-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(30,58,95,0.4);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.compose-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.compose-file-btn:hover { border-color: var(--neon); color: var(--neon-glow); }
+
+/* Feed tabs */
+.feed-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 20px;
+  width: fit-content;
+}
+.feed-tab {
+  padding: 7px 16px;
+  border-radius: 7px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  transition: 0.15s;
+  text-decoration: none;
+}
+.feed-tab.active, .feed-tab:hover {
+  background: var(--neon);
+  color: white;
+}
+
+/* Sidebar widgets */
+.sidebar-widget {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.widget-header {
+  padding: 12px 16px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.widget-body { padding: 8px 0; }
+.widget-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  text-decoration: none;
+  color: var(--text-primary);
+  transition: 0.15s;
+  font-size: 0.82rem;
+}
+.widget-item:hover { background: var(--bg-primary); }
+.widget-result {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(30,58,95,0.3);
+  font-size: 0.8rem;
+}
+.widget-result:last-child { border-bottom: none; }
+.result-score {
+  font-weight: 800;
+  color: var(--neon-glow);
+  font-size: 0.9rem;
+}
+
+/* Team tag section */
+#team-tag-section {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+  .feed-layout { grid-template-columns: 1fr; }
+  .feed-sidebar { display: none; }
+}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">📰 <span>Feed</span></div>
+    <div class="page-subtitle">Resultados, anúncios e novidades em tempo real.</div>
+  </div>
+</div>
+
+<div class="feed-layout">
+
+  <!-- ─── Feed principal ──────────────────────────────────── -->
+  <div>
+
+    <!-- Compose box (admin/manager) -->
+    {% if current_user.role in ['admin','manager'] %}
+    <div class="feed-compose">
+      <form method="POST" action="{{ url_for('feed.create_post') }}" enctype="multipart/form-data" id="compose-form">
+        <input type="hidden" name="next" value="{{ url_for('feed.global_feed') }}" />
+
+        <div class="compose-header">
+          <div class="compose-avatar">{{ current_user.display_name[0].upper() }}</div>
+          <div style="flex:1;">
+            <div style="font-size:0.82rem;font-weight:700;color:var(--text-primary);">{{ current_user.display_name }}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">{{ current_user.role_label }}</div>
+          </div>
+        </div>
+
+        <div class="compose-meta">
+          <select name="post_type">
+            <option value="announce">📢 Anúncio</option>
+            <option value="news">📰 Notícia</option>
+            <option value="highlight">⭐ Destaque</option>
+            <option value="lineup">📋 Convocatória</option>
+          </select>
+          <select name="scope" id="scope-select" onchange="toggleTeamTag(this.value)">
+            <option value="global">🌍 Global</option>
+            <option value="tournament">🏆 Campeonato</option>
+            <option value="team">🧑‍🤝‍🧑 Equipas</option>
+          </select>
+          <select name="tournament_id">
+            <option value="">— Campeonato —</option>
+            {% for t in tournaments %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <input type="text" name="title" class="form-control"
+               placeholder="Título (opcional)"
+               style="margin-bottom:8px;font-size:0.85rem;" />
+
+        <textarea name="content" class="compose-textarea"
+                  placeholder="O que está a acontecer no torneio?" required
+                  oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'"></textarea>
+
+        <!-- Tag equipas -->
+        <div id="team-tag-section" style="display:none;margin-top:10px;">
+          <div style="font-size:0.7rem;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">Marcar Equipas</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            {% for t in teams %}
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.75rem;cursor:pointer;
+                          padding:3px 10px;background:var(--bg-secondary);border:1px solid var(--border);
+                          border-radius:20px;transition:0.15s;"
+                   onmouseover="this.style.borderColor='var(--neon)'"
+                   onmouseout="this.style.borderColor='var(--border)'">
+              <input type="checkbox" name="tagged_teams" value="{{ t.id }}"
+                     style="accent-color:var(--neon);width:12px;height:12px;" />
+              <div style="width:10px;height:10px;border-radius:50%;background:{{ t.primary_color or '#2563eb' }};"></div>
+              {{ t.name }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="compose-footer">
+          <div class="compose-actions">
+            <label class="compose-file-btn">
+              🖼️ Imagem
+              <input type="file" name="image" accept="image/*" style="display:none;"
+                     onchange="showFileName(this)" />
+            </label>
+            <span id="file-name" style="font-size:0.72rem;color:var(--text-muted);"></span>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="border-radius:20px;padding:7px 20px;">
+            📢 Publicar
+          </button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Feed tabs -->
+    <div class="feed-tabs">
+      <a href="{{ url_for('feed.global_feed') }}" class="feed-tab active">🌍 Tudo</a>
+      <a href="{{ url_for('feed.global_feed') }}?filter=results" class="feed-tab">🏆 Resultados</a>
+      <a href="{{ url_for('feed.global_feed') }}?filter=announce" class="feed-tab">📢 Anúncios</a>
+    </div>
+
+    <!-- Posts -->
+    {% set filter = request.args.get('filter', '') %}
+    {% set filtered = posts | selectattr('post_type','equalto','result') | list if filter == 'results'
+                      else posts | selectattr('post_type','equalto','announce') | list if filter == 'announce'
+                      else posts %}
+
+    {% if filtered %}
+    {% for post in filtered %}
+    {% include 'feed/_post_card.html' %}
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" style="padding:60px 20px;">
+      <div class="empty-icon">📰</div>
+      <p>Nenhuma publicação ainda.</p>
+      <p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;">
+        Os resultados dos jogos aparecem aqui automaticamente quando terminam.
+      </p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- ─── Sidebar ──────────────────────────────────────────── -->
+  <div class="feed-sidebar" style="position:sticky;top:20px;">
+
+    <!-- Últimos resultados -->
+    <div class="sidebar-widget">
+      <div class="widget-header">🏆 Últimos Resultados</div>
+      <div class="widget-body">
+        {% set results = posts | selectattr('post_type','equalto','result') | list %}
+        {% if results %}
+        {% for p in results[:6] %}
+        <div class="widget-result">
+          <div class="result-score">{{ p.title }}</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;display:flex;align-items:center;justify-content:space-between;">
+            <span>{{ p.created_at.strftime('%d/%m %H:%M') if p.created_at else '' }}</span>
+            {% if p.match_id %}
+            <a href="{{ url_for('match.match_detail', match_id=p.match_id) }}"
+               style="color:var(--neon-glow);text-decoration:none;font-size:0.65rem;">Ver →</a>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div style="padding:16px;font-size:0.82rem;color:var(--text-muted);text-align:center;">
+          Sem resultados ainda.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Campeonatos -->
+    {% if tournaments %}
+    <div class="sidebar-widget">
+      <div class="widget-header">🏆 Campeonatos</div>
+      <div class="widget-body">
+        {% for t in tournaments[:5] %}
+        <a href="{{ url_for('tournament.tournament_room', tournament_id=t.id) }}" class="widget-item">
+          {% if t.logo_url %}
+          <img src="{{ url_for('static', filename=t.logo_url) }}"
+               style="width:24px;height:24px;border-radius:4px;object-fit:cover;flex-shrink:0;" />
+          {% else %}
+          <div style="width:24px;height:24px;border-radius:4px;background:var(--neon);
+               display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;">🏆</div>
+          {% endif %}
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;">{{ t.name }}</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);">
+              <span class="badge badge-{{ t.status }}" style="font-size:0.6rem;padding:1px 5px;">
+                {% if t.status=='active' %}Ativo{% elif t.status=='pending' %}Inscrições{% else %}Terminado{% endif %}
+              </span>
+            </div>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Equipas -->
+    {% if teams %}
+    <div class="sidebar-widget">
+      <div class="widget-header">🧑‍🤝‍🧑 Equipas</div>
+      <div class="widget-body">
+        {% for t in teams[:6] %}
+        <a href="{{ url_for('team.team_room', team_id=t.id) }}" class="widget-item">
+          <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;
+               background:{{ t.primary_color or '#2563eb' }};
+               display:flex;align-items:center;justify-content:center;
+               font-size:0.6rem;font-weight:900;color:{{ t.secondary_color or '#fff' }};">
+            {{ t.initials }}
+          </div>
+          <div>
+            <div style="font-weight:600;font-size:0.82rem;">{{ t.name }}</div>
+            {% if t.city %}
+            <div style="font-size:0.68rem;color:var(--text-muted);">📍 {{ t.city }}</div>
+            {% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+function toggleTeamTag(scope) {
+  document.getElementById('team-tag-section').style.display =
+    scope === 'team' ? 'block' : 'none';
+}
+
+function showFileName(input) {
+  const el = document.getElementById('file-name');
+  if (input.files.length > 0) {
+    el.textContent = '✅ ' + input.files[0].name;
+  }
+}
+
+// Auto-resize textarea
+document.querySelectorAll('.compose-textarea').forEach(ta => {
+  ta.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = this.scrollHeight + 'px';
+  });
+});
+</script>
+{% endblock %}

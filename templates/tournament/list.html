@@ -1,0 +1,58 @@
+﻿{% extends 'base.html' %}
+{% block title %}Campeonatos — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">🏆 Campeonatos</div>
+    <div class="page-subtitle">Todos os torneios criados no sistema.</div>
+  </div>
+  <a href="{{ url_for('tournament.create_tournament') }}" class="btn btn-primary">
+    🚀 Novo Torneio
+  </a>
+</div>
+
+{% if tournaments %}
+<div class="grid-auto">
+  {% for t in tournaments %}
+  <div class="tournament-card" style="position: relative;">
+    <a href="{{ url_for('tournament.tournament_room', tournament_id=t.id) }}" style="text-decoration: none; color: inherit; display: block;">
+      <div class="tournament-card-header">
+        <div>
+          <div class="tournament-name">{{ t.name }}</div>
+          <div class="tournament-type">
+            {% if t.type == 'liga' %}⚽ Liga
+            {% elif t.type == 'grupos_eliminatoria' %}🏟️ Grupos + Mata-mata
+            {% else %}⚔️ Eliminatória Direta{% endif %}
+          </div>
+        </div>
+        <span class="badge badge-{{ t.status }}">
+          {% if t.status == 'active' %}Ativo
+          {% elif t.status == 'finished' %}Terminado
+          {% else %}Pendente{% endif %}
+        </span>
+      </div>
+      <div class="tournament-card-footer">
+        <span>👥 {{ t.teams_count }} equipas</span>
+        {% if t.groups_count > 0 %}<span>🔠 {{ t.groups_count }} grupos</span>{% endif %}
+        <span>📆 {{ t.start_date }}</span>
+      </div>
+    </a>
+    <div style="margin-top: 14px; display: flex; gap: 8px;">
+      <a href="{{ url_for('tournament.tournament_room', tournament_id=t.id) }}" class="btn btn-secondary btn-sm">Ver Sala</a>
+      <form method="POST" action="{{ url_for('tournament.delete_tournament', tournament_id=t.id) }}"
+            onsubmit="return confirm('Eliminar este torneio?')">
+        <button type="submit" class="btn btn-danger btn-sm">🗑️</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">🏆</div>
+  <p>Nenhum campeonato criado ainda.</p>
+  <a href="{{ url_for('tournament.create_tournament') }}" class="btn btn-primary">🚀 Criar primeiro torneio</a>
+</div>
+{% endif %}
+{% endblock %}

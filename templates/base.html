@@ -1,0 +1,152 @@
+﻿<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AUSTIN LEAGUE CORE{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+{% if current_user.is_authenticated %}
+<div class="layout">
+
+  <!-- ─── Sidebar ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">AUSTIN <span>MatchFlow</span></div>
+      <div class="logo-sub">League Core Engine</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' }}">
+        <span class="nav-icon">🏠</span> Dashboard
+      </a>
+      <a href="{{ url_for('feed.global_feed') }}" class="{{ 'active' if 'feed' in request.endpoint }}">
+        <span class="nav-icon">📰</span> Feed
+      </a>
+
+      <div class="nav-section-label">Competição</div>
+      <a href="{{ url_for('tournament.list_tournaments') }}" class="{{ 'active' if 'tournament' in request.endpoint }}">
+        <span class="nav-icon">🏆</span> Campeonatos
+      </a>
+      <a href="{{ url_for('match.list_matches') }}" class="{{ 'active' if 'match' in request.endpoint }}">
+        <span class="nav-icon">📅</span> Jogos do Dia
+      </a>
+
+      <div class="nav-section-label">Equipas</div>
+      <a href="{{ url_for('team.list_teams') }}" class="{{ 'active' if 'team' in request.endpoint }}">
+        <span class="nav-icon">🧑‍🤝‍🧑</span> Equipas
+      </a>
+      <a href="{{ url_for('player.ranking') }}" class="{{ 'active' if request.endpoint == 'player.ranking' }}">
+        <span class="nav-icon">📊</span> Ranking
+      </a>
+      <a href="{{ url_for('market.free_market') }}" class="{{ 'active' if 'market' in request.endpoint }}">
+        <span class="nav-icon">🏪</span> Mercado Livre
+        {% if current_user.is_free_agent %}
+        <span style="font-size:0.6rem;background:var(--warning);color:#000;
+                     padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:700;">LIVRE</span>
+        {% endif %}
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      {% if current_user.role == 'admin' %}
+      <a href="{{ url_for('auth.admin_users') }}" class="{{ 'active' if request.endpoint == 'auth.admin_users' }}">
+        <span class="nav-icon">👑</span> Utilizadores
+      </a>
+      {% endif %}
+      <a href="{{ url_for('auth.profile') }}" class="{{ 'active' if request.endpoint == 'auth.profile' }}">
+        <span class="nav-icon">👤</span>
+        <span>{{ current_user.display_name }}</span>
+        <span style="font-size: 0.6rem; background: rgba(37,99,235,0.15); color: var(--neon-glow);
+                     padding: 1px 5px; border-radius: 3px; margin-left: 4px;">{{ current_user.role }}</span>
+      </a>
+      <a href="{{ url_for('auth.logout') }}">
+        <span class="nav-icon">🚪</span> Sair
+      </a>
+    </div>
+  </aside>
+
+  <!-- ─── Main ─────────────────────────────────────────────── -->
+  <main class="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }}">
+          {{ '✅' if category == 'success' else '❌' if category == 'error' else 'ℹ️' }}
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+</div>
+{% else %}
+  {% block auth_content %}{% endblock %}
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+{% if current_user.is_authenticated %}
+<!-- ─── Ticker de Resultados (rodapé dinâmico) ─────────────── -->
+<div id="results-ticker" style="
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--bg-secondary);
+  border-top:1px solid var(--border);
+  height:36px;overflow:hidden;
+  display:flex;align-items:center;">
+  <div style="flex-shrink:0;padding:0 14px;font-size:0.65rem;font-weight:800;
+              letter-spacing:0.12em;text-transform:uppercase;color:var(--neon-glow);
+              border-right:1px solid var(--border);height:100%;display:flex;align-items:center;
+              background:var(--bg-card);">
+    🏆 RESULTADOS
+  </div>
+  <div id="ticker-track" style="
+    display:flex;align-items:center;gap:0;
+    white-space:nowrap;overflow:hidden;flex:1;
+    animation:ticker-scroll 40s linear infinite;">
+    <span id="ticker-content" style="font-size:0.72rem;color:var(--text-secondary);padding:0 20px;">
+      A carregar resultados...
+    </span>
+  </div>
+</div>
+
+<!-- Espaço para o ticker não tapar conteúdo -->
+<div style="height:36px;"></div>
+
+<style>
+@keyframes ticker-scroll {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+#ticker-track:hover { animation-play-state: paused; }
+</style>
+
+<script>
+// Carregar resultados do ticker via API
+fetch('/feed/ticker')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) return;
+    const content = document.getElementById('ticker-content');
+    const items = data.map(p =>
+      `<span style="margin:0 32px;">
+        <span style="color:var(--neon-glow);font-weight:700;">${p.title}</span>
+        <span style="color:var(--text-muted);font-size:0.65rem;margin-left:8px;">${p.created_at}</span>
+      </span>`
+    ).join('<span style="color:var(--border);margin:0 8px;">|</span>');
+    // Duplicate for seamless loop
+    content.innerHTML = items + items;
+  })
+  .catch(() => {
+    document.getElementById('ticker-content').textContent = 'AUSTIN LEAGUE CORE ⚡';
+  });
+</script>
+{% endif %}
+</body>
+</html>

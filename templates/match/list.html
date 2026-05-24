@@ -1,0 +1,70 @@
+﻿{% extends 'base.html' %}
+{% block title %}Jogos — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">📅 Jogos do Dia</div>
+    <div class="page-subtitle">Filtra por data e estado.</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<form method="GET" style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+  <div>
+    <label class="form-label">Data</label>
+    <input type="date" name="date" value="{{ filter_date }}" class="form-control" style="width: auto;" />
+  </div>
+  <div>
+    <label class="form-label">Estado</label>
+    <select name="status" class="form-control" style="width: auto;">
+      <option value="">Todos</option>
+      <option value="scheduled" {{ 'selected' if filter_status == 'scheduled' }}>⏳ Agendado</option>
+      <option value="live" {{ 'selected' if filter_status == 'live' }}>🔴 Ao Vivo</option>
+      <option value="finished" {{ 'selected' if filter_status == 'finished' }}>✅ Terminado</option>
+    </select>
+  </div>
+  <div style="display: flex; align-items: flex-end;">
+    <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+  </div>
+  <div style="display: flex; align-items: flex-end;">
+    <a href="{{ url_for('match.list_matches') }}" class="btn btn-secondary btn-sm">Hoje</a>
+  </div>
+</form>
+
+{% if matches %}
+  {% set current_tournament = namespace(val=None) %}
+  {% for m in matches %}
+    {% if m.tournament_id != current_tournament.val %}
+      {% set current_tournament.val = m.tournament_id %}
+      <div style="margin: 20px 0 10px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+                  text-transform: uppercase; color: var(--text-muted);">
+        🏆 {{ m.tournament.name }}
+      </div>
+    {% endif %}
+    <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom: 8px;">
+      <div class="match-team">
+        <div class="team-name">{{ m.team1.name }}</div>
+      </div>
+      <div class="match-score">
+        <div class="score-display">{{ m.score_display }}</div>
+        <div class="match-meta">
+          <span class="badge badge-{{ m.status }}">
+            {% if m.status == 'finished' %}FT
+            {% elif m.status == 'live' %}🔴 AO VIVO
+            {% else %}{{ m.time }}{% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="match-team right">
+        <div class="team-name">{{ m.team2.name }}</div>
+      </div>
+    </a>
+  {% endfor %}
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📅</div>
+  <p>Nenhum jogo encontrado para os filtros selecionados.</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,457 @@
+{% extends 'base.html' %}
+{% block title %}Finanças & Premiações — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">💰 Finanças & Premiações</div>
+    <div class="page-subtitle">{{ tournament.name }}</div>
+  </div>
+  <a href="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}"
+     class="btn btn-secondary">← Torneio</a>
+</div>
+
+<!-- ─── Summary cards ─────────────────────────────────────────── -->
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat-card">
+    <div class="stat-icon">💵</div>
+    <div class="stat-value" style="font-size:1.2rem;">
+      {{ '{:,.0f}'.format(total_collected) }} {{ tournament.currency }}
+    </div>
+    <div class="stat-label">Total Arrecadado</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">🏆</div>
+    <div class="stat-value" style="font-size:1.2rem;">
+      {{ '{:,.0f}'.format(total_prizes) }} {{ tournament.currency }}
+    </div>
+    <div class="stat-label">Total Prémios</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📊</div>
+    <div class="stat-value" style="font-size:1.2rem;color:{% if balance >= 0 %}var(--success){% else %}var(--danger){% endif %};">
+      {{ '{:,.0f}'.format(balance) }} {{ tournament.currency }}
+    </div>
+    <div class="stat-label">Saldo</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div class="stat-value">{{ registered|length }}</div>
+    <div class="stat-label">Equipas Inscritas</div>
+  </div>
+</div>
+
+<!-- ─── Tabs ─────────────────────────────────────────────────── -->
+<div class="tabs" style="margin-bottom:24px;">
+  <a href="#taxas" class="tab-btn active" onclick="showTab('taxas',this)">💳 Taxas & Pagamentos</a>
+  <a href="#premiacoes" class="tab-btn" onclick="showTab('premiacoes',this)">🏆 Premiações</a>
+  <a href="#vencedores" class="tab-btn" onclick="showTab('vencedores',this)">🥇 Vencedores</a>
+  <a href="#stats" class="tab-btn" onclick="showTab('stats',this)">📊 Estatísticas</a>
+</div>
+
+<!-- ═══ TAB: TAXAS & PAGAMENTOS ═══ -->
+<div id="taxas" class="tab-content">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+    <!-- Configurar taxas -->
+    <div class="card">
+      <div class="card-title">⚙️ Configurar Taxas</div>
+      <form method="POST" action="{{ url_for('finance.save_settings', tid=tournament.id) }}">
+        <div class="form-group">
+          <label class="form-label">Moeda</label>
+          <select name="currency" class="form-control" style="max-width:120px;">
+            {% for c in ['KWZ','EUR','USD','BRL'] %}
+            <option value="{{ c }}" {{ 'selected' if tournament.currency == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Taxa de Inscrição (por equipa)</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" name="registration_fee" class="form-control"
+                   value="{{ tournament.registration_fee or 0 }}" min="0" step="100"
+                   style="max-width:180px;" />
+            <span style="font-size:0.85rem;color:var(--text-muted);">{{ tournament.currency }}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Taxa de Participação (por equipa)</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" name="participation_fee" class="form-control"
+                   value="{{ tournament.participation_fee or 0 }}" min="0" step="1000"
+                   style="max-width:180px;" />
+            <span style="font-size:0.85rem;color:var(--text-muted);">{{ tournament.currency }}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fundo de Prémios Total</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" name="prize_pool_total" class="form-control"
+                   value="{{ tournament.prize_pool_total or 0 }}" min="0" step="1000"
+                   style="max-width:180px;" />
+            <span style="font-size:0.85rem;color:var(--text-muted);">{{ tournament.currency }}</span>
+          </div>
+        </div>
+
+        <!-- Preview cálculo -->
+        {% if registered %}
+        <div style="background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.2);
+                    border-radius:8px;padding:12px;margin-bottom:14px;font-size:0.82rem;">
+          <div style="font-weight:700;color:var(--neon-glow);margin-bottom:6px;">📊 Previsão</div>
+          <div style="color:var(--text-secondary);">
+            {{ registered|length }} equipas ×
+            {{ '{:,.0f}'.format(tournament.registration_fee or 0) }} (inscrição) +
+            {{ '{:,.0f}'.format(tournament.participation_fee or 0) }} (participação) =
+            <strong style="color:var(--success);">
+              {{ '{:,.0f}'.format(registered|length * ((tournament.registration_fee or 0) + (tournament.participation_fee or 0))) }}
+              {{ tournament.currency }}
+            </strong>
+          </div>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Taxas</button>
+      </form>
+    </div>
+
+    <!-- Estado dos pagamentos -->
+    <div class="card">
+      <div class="card-title">💳 Estado dos Pagamentos</div>
+      {% if payments %}
+      <div class="table-wrapper" style="border:none;">
+        <table>
+          <thead>
+            <tr>
+              <th>Equipa</th>
+              <th>Tipo</th>
+              <th>Valor</th>
+              <th>Estado</th>
+              <th>Ação</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+            <tr>
+              <td style="font-weight:600;">{{ p.team.name }}</td>
+              <td style="font-size:0.78rem;color:var(--text-muted);">{{ p.type_label }}</td>
+              <td style="font-weight:700;color:var(--neon-glow);">
+                {{ '{:,.0f}'.format(p.amount) }} {{ p.currency }}
+              </td>
+              <td>
+                <span class="badge badge-{% if p.status=='paid' %}active{% elif p.status=='partial' %}pending{% elif p.status=='waived' %}finished{% else %}live{% endif %}"
+                      id="status-badge-{{ p.id }}">
+                  {{ p.status_label }}
+                </span>
+              </td>
+              <td>
+                <select onchange="updatePayment({{ p.id }}, this.value)"
+                        style="font-size:0.72rem;padding:3px 6px;background:var(--bg-primary);
+                               border:1px solid var(--border);border-radius:4px;color:var(--text-primary);">
+                  {% for s, l in [('pending','⏳ Pendente'),('paid','✅ Pago'),('partial','🔶 Parcial'),('waived','🔵 Isento')] %}
+                  <option value="{{ s }}" {{ 'selected' if p.status == s }}>{{ l }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:0.85rem;padding:12px 0;">
+        Configura as taxas e guarda para gerar os registos de pagamento.
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ TAB: PREMIAÇÕES ═══ -->
+<div id="premiacoes" class="tab-content" style="display:none;">
+  <div style="max-width:800px;">
+    <div class="card">
+      <div class="card-title">🏆 Configurar Premiações</div>
+      <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:16px;">
+        Ativa os prémios que queres atribuir e define os valores. O sistema calcula automaticamente os vencedores.
+      </p>
+
+      <form method="POST" action="{{ url_for('finance.save_awards', tid=tournament.id) }}" id="awards-form">
+
+        <!-- Prémios de equipa -->
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+                    color:var(--text-muted);margin-bottom:10px;">🧑‍🤝‍🧑 Prémios de Equipa</div>
+
+        {% set team_awards = [
+          ('1st',  '🥇 1º Lugar',  'Campeão'),
+          ('2nd',  '🥈 2º Lugar',  'Vice-campeão'),
+          ('3rd',  '🥉 3º Lugar',  'Terceiro classificado'),
+        ] %}
+        {% for atype, icon_label, default_label in team_awards %}
+        {% set existing = awards | selectattr('award_type','equalto',atype) | list %}
+        {% set aw = existing[0] if existing else none %}
+        <div class="award-row" style="display:flex;align-items:center;gap:12px;padding:12px 0;
+                                       border-bottom:1px solid var(--border);">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-width:180px;">
+            <input type="checkbox" name="award_active" value="{{ loop.index0 }}"
+                   style="accent-color:var(--neon);width:16px;height:16px;"
+                   {{ 'checked' if not aw or aw.is_active }} />
+            <span style="font-size:0.9rem;font-weight:700;">{{ icon_label }}</span>
+          </label>
+          <input type="hidden" name="award_type" value="{{ atype }}" />
+          <input type="text" name="award_label" class="form-control"
+                 value="{{ aw.label if aw else default_label }}"
+                 placeholder="{{ default_label }}" style="max-width:160px;font-size:0.82rem;" />
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" name="award_value" class="form-control"
+                   value="{{ aw.prize_value if aw else 0 }}" min="0" step="1000"
+                   style="max-width:130px;font-size:0.82rem;" />
+            <span style="font-size:0.78rem;color:var(--text-muted);">{{ tournament.currency }}</span>
+          </div>
+          <input type="text" name="award_desc" class="form-control"
+                 value="{{ aw.prize_desc if aw else '' }}"
+                 placeholder="Descrição (opcional)" style="font-size:0.78rem;" />
+        </div>
+        {% endfor %}
+
+        <!-- Prémios individuais -->
+        <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+                    color:var(--text-muted);margin:16px 0 10px;">⚽ Prémios Individuais</div>
+
+        {% set player_awards = [
+          ('top_scorer', '⚽ Melhor Marcador',   'Jogador com mais golos'),
+          ('top_assist', '🎯 Melhor Assistente',  'Jogador com mais assistências'),
+          ('mvp',        '⭐ MVP',                'Melhor jogador do torneio'),
+          ('best_gk',    '🧤 Melhor GR',          'Melhor guarda-redes'),
+          ('fair_play',  '🤝 Fair Play',           'Equipa com melhor comportamento'),
+        ] %}
+        {% set offset = 3 %}
+        {% for atype, icon_label, default_label in player_awards %}
+        {% set existing = awards | selectattr('award_type','equalto',atype) | list %}
+        {% set aw = existing[0] if existing else none %}
+        <div class="award-row" style="display:flex;align-items:center;gap:12px;padding:12px 0;
+                                       border-bottom:1px solid var(--border);">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;min-width:180px;">
+            <input type="checkbox" name="award_active" value="{{ loop.index0 + offset }}"
+                   style="accent-color:var(--neon);width:16px;height:16px;"
+                   {{ 'checked' if not aw or aw.is_active }} />
+            <span style="font-size:0.9rem;font-weight:700;">{{ icon_label }}</span>
+          </label>
+          <input type="hidden" name="award_type" value="{{ atype }}" />
+          <input type="text" name="award_label" class="form-control"
+                 value="{{ aw.label if aw else default_label }}"
+                 placeholder="{{ default_label }}" style="max-width:160px;font-size:0.82rem;" />
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" name="award_value" class="form-control"
+                   value="{{ aw.prize_value if aw else 0 }}" min="0" step="500"
+                   style="max-width:130px;font-size:0.82rem;" />
+            <span style="font-size:0.78rem;color:var(--text-muted);">{{ tournament.currency }}</span>
+          </div>
+          <input type="text" name="award_desc" class="form-control"
+                 value="{{ aw.prize_desc if aw else '' }}"
+                 placeholder="Troféu, medalha..." style="font-size:0.78rem;" />
+        </div>
+        {% endfor %}
+
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;">
+          <button type="submit" class="btn btn-primary">💾 Guardar Premiações</button>
+          <div style="font-size:0.78rem;color:var(--text-muted);">
+            Total configurado:
+            <strong style="color:var(--neon-glow);" id="awards-total">
+              {{ '{:,.0f}'.format(awards | sum(attribute='prize_value')) }} {{ tournament.currency }}
+            </strong>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: VENCEDORES ═══ -->
+<div id="vencedores" class="tab-content" style="display:none;">
+  <div style="max-width:700px;">
+
+    <div style="display:flex;gap:10px;margin-bottom:20px;">
+      <form method="POST" action="{{ url_for('finance.assign_winners', tid=tournament.id) }}">
+        <button class="btn btn-primary btn-sm">🤖 Atribuir Automaticamente</button>
+      </form>
+      <span style="font-size:0.8rem;color:var(--text-muted);align-self:center;">
+        O sistema calcula com base nas estatísticas dos jogos.
+      </span>
+    </div>
+
+    {% if awards %}
+    {% for award in awards if award.is_active %}
+    <div class="card" style="margin-bottom:12px;{% if award.award_type == '1st' %}border-color:rgba(245,158,11,0.4);{% elif award.award_type == '2nd' %}border-color:rgba(148,163,184,0.4);{% elif award.award_type == '3rd' %}border-color:rgba(180,83,9,0.4);{% endif %}">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="font-size:1.8rem;">{{ award.icon }}</div>
+          <div>
+            <div style="font-weight:800;font-size:0.95rem;color:var(--text-primary);">{{ award.display_label }}</div>
+            {% if award.prize_value %}
+            <div style="font-size:0.78rem;color:var(--neon-glow);font-weight:700;">
+              {{ '{:,.0f}'.format(award.prize_value) }} {{ tournament.currency }}
+              {% if award.prize_desc %} · {{ award.prize_desc }}{% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Winner display / selector -->
+        <div style="display:flex;align-items:center;gap:10px;">
+          {% if award.is_team_award %}
+            {% if award.winner_team %}
+            <div style="display:flex;align-items:center;gap:8px;">
+              {% if award.winner_team.logo_url %}
+              <img src="{{ url_for('static', filename=award.winner_team.logo_url) }}"
+                   style="width:28px;height:28px;border-radius:50%;object-fit:contain;background:var(--bg-secondary);padding:2px;" />
+              {% else %}
+              <div style="width:28px;height:28px;border-radius:50%;background:{{ award.winner_team.primary_color or '#2563eb' }};
+                   display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:900;color:white;">
+                {{ award.winner_team.initials }}
+              </div>
+              {% endif %}
+              <span style="font-weight:700;color:var(--text-primary);">{{ award.winner_team.name }}</span>
+            </div>
+            {% else %}
+            <span style="font-size:0.8rem;color:var(--text-muted);font-style:italic;">A definir</span>
+            {% endif %}
+            <!-- Manual override -->
+            <form method="POST" action="{{ url_for('finance.assign_winners', tid=tournament.id) }}" style="display:inline;">
+              <select name="manual_team_{{ award.id }}" class="form-control"
+                      style="font-size:0.72rem;padding:3px 6px;width:auto;"
+                      onchange="this.form.submit()">
+                <option value="">— Selecionar —</option>
+                {% for tt in stats.standings %}
+                <option value="{{ tt.team_id }}" {{ 'selected' if award.winner_team_id == tt.team_id }}>
+                  {{ tt.team.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </form>
+
+          {% elif award.is_player_award %}
+            {% if award.winner_player %}
+            <div style="display:flex;align-items:center;gap:8px;">
+              {% if award.winner_player.photo_url %}
+              <img src="{{ url_for('static', filename=award.winner_player.photo_url) }}"
+                   style="width:28px;height:28px;border-radius:50%;object-fit:cover;" />
+              {% else %}
+              <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--neon),var(--accent));
+                   display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:900;color:white;">
+                {{ award.winner_player.display_name[0].upper() }}
+              </div>
+              {% endif %}
+              <div>
+                <div style="font-weight:700;font-size:0.85rem;">{{ award.winner_player.display_name }}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted);">{{ award.winner_player.team.name }}</div>
+              </div>
+            </div>
+            {% else %}
+            <span style="font-size:0.8rem;color:var(--text-muted);font-style:italic;">A definir</span>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-state"><div class="empty-icon">🏆</div><p>Configura as premiações primeiro.</p></div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state"><div class="empty-icon">🏆</div><p>Configura as premiações primeiro.</p></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ═══ TAB: ESTATÍSTICAS ═══ -->
+<div id="stats" class="tab-content" style="display:none;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+    <!-- Top Scorers -->
+    <div class="card">
+      <div class="card-title">⚽ Ranking de Marcadores</div>
+      {% set scorers = stats.players | sort(attribute='goals', reverse=True) %}
+      {% if scorers %}
+      <div class="table-wrapper" style="border:none;">
+        <table>
+          <thead><tr><th>#</th><th>Jogador</th><th>Equipa</th><th>⚽</th><th>🎯</th><th>⭐ MVP</th></tr></thead>
+          <tbody>
+            {% for p in scorers[:10] if p.goals %}
+            <tr>
+              <td><span style="font-weight:800;color:{% if loop.index==1 %}#f59e0b{% elif loop.index==2 %}#94a3b8{% elif loop.index==3 %}#b45309{% else %}var(--text-muted){% endif %}">
+                {% if loop.index==1 %}🥇{% elif loop.index==2 %}🥈{% elif loop.index==3 %}🥉{% else %}{{ loop.index }}{% endif %}
+              </span></td>
+              <td style="font-weight:600;">{{ p.display_name }}</td>
+              <td style="font-size:0.78rem;color:var(--text-muted);">{{ p.team.name }}</td>
+              <td style="font-weight:800;color:var(--success);">{{ p.goals }}</td>
+              <td style="color:var(--accent);">{{ p.assists }}</td>
+              <td style="font-size:0.78rem;color:var(--warning);">
+                {{ '{:.1f}'.format(stats.mvp_score(p)) }}
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:12px;">Sem dados ainda.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:0.85rem;">Sem dados ainda.</div>
+      {% endif %}
+    </div>
+
+    <!-- Classificação -->
+    <div class="card">
+      <div class="card-title">📊 Classificação Final</div>
+      {% if stats.standings %}
+      <div class="table-wrapper" style="border:none;">
+        <table>
+          <thead><tr><th>#</th><th>Equipa</th><th>J</th><th>V</th><th>D</th><th>Pts</th></tr></thead>
+          <tbody>
+            {% for tt in stats.standings %}
+            <tr>
+              <td><span style="font-weight:800;color:{% if loop.index==1 %}#f59e0b{% elif loop.index==2 %}#94a3b8{% elif loop.index==3 %}#b45309{% else %}var(--text-muted){% endif %}">{{ loop.index }}</span></td>
+              <td style="font-weight:600;">{{ tt.team.name }}</td>
+              <td>{{ tt.played }}</td>
+              <td style="color:var(--success);">{{ tt.wins }}</td>
+              <td style="color:var(--danger);">{{ tt.losses }}</td>
+              <td style="font-weight:800;color:var(--neon-glow);">{{ tt.points }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="color:var(--text-muted);font-size:0.85rem;">Sem dados ainda.</div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+function showTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).style.display = 'block';
+  if (btn) btn.classList.add('active');
+  return false;
+}
+
+function updatePayment(paymentId, newStatus) {
+  const formData = new FormData();
+  formData.append('status', newStatus);
+  fetch('/tournaments/{{ tournament.id }}/finance/payment/' + paymentId, {
+    method: 'POST',
+    body: formData
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      const badge = document.getElementById('status-badge-' + paymentId);
+      if (badge) badge.textContent = data.status;
+    }
+  });
+}
+</script>
+{% endblock %}

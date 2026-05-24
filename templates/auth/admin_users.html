@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}Gestão de Utilizadores — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">👑 Gestão de Utilizadores</div>
+    <div class="page-subtitle">{{ users | length }} conta{{ 's' if users | length != 1 }} registada{{ 's' if users | length != 1 }} no sistema.</div>
+  </div>
+</div>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>ID Público</th>
+        <th>Username</th>
+        <th>Nome</th>
+        <th>Email</th>
+        <th>Role</th>
+        <th>Estado</th>
+        <th>Registado</th>
+        <th>Último Login</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td style="color: var(--text-muted); font-weight: 700;">{{ u.id }}</td>
+        <td>
+          <span style="font-family: monospace; font-size: 0.68rem; color: var(--neon-glow);"
+                title="{{ u.public_id }}">
+            {{ u.public_id[:8] }}…
+          </span>
+        </td>
+        <td style="font-weight: 600;">
+          @{{ u.username }}
+          {% if u.id == current_user.id %}
+          <span style="font-size: 0.65rem; background: rgba(37,99,235,0.15); color: var(--neon-glow);
+                       padding: 1px 6px; border-radius: 4px; margin-left: 4px;">Tu</span>
+          {% endif %}
+        </td>
+        <td>{{ u.full_name or '—' }}</td>
+        <td style="font-size: 0.8rem; color: var(--text-muted);">{{ u.email }}</td>
+        <td>
+          <form method="POST" action="{{ url_for('auth.change_role', user_id=u.id) }}"
+                style="display: flex; gap: 6px; align-items: center;">
+            <select name="role" class="form-control" style="padding: 4px 8px; font-size: 0.75rem; width: auto;"
+                    onchange="this.form.submit()" {{ 'disabled' if u.id == current_user.id }}>
+              <option value="admin" {{ 'selected' if u.role == 'admin' }}>👑 Admin</option>
+              <option value="manager" {{ 'selected' if u.role == 'manager' }}>👔 Manager</option>
+              <option value="player" {{ 'selected' if u.role == 'player' }}>⚽ Jogador</option>
+            </select>
+          </form>
+        </td>
+        <td>
+          {% if u.is_active %}
+          <span class="badge badge-active">Ativo</span>
+          {% else %}
+          <span class="badge badge-finished">Inativo</span>
+          {% endif %}
+        </td>
+        <td style="font-size: 0.78rem; color: var(--text-muted);">
+          {{ u.created_at.strftime('%d/%m/%Y') if u.created_at else '—' }}
+        </td>
+        <td style="font-size: 0.78rem; color: var(--text-muted);">
+          {{ u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else '—' }}
+        </td>
+        <td>
+          {% if u.id != current_user.id %}
+          <form method="POST" action="{{ url_for('auth.toggle_user', user_id=u.id) }}"
+                onsubmit="return confirm('{{ 'Desativar' if u.is_active else 'Ativar' }} conta de {{ u.username }}?')">
+            <button type="submit" class="btn btn-sm {{ 'btn-danger' if u.is_active else 'btn-success' }}"
+                    style="padding: 4px 10px; font-size: 0.72rem;">
+              {{ '🔒 Desativar' if u.is_active else '🔓 Ativar' }}
+            </button>
+          </form>
+          {% else %}
+          <span style="font-size: 0.72rem; color: var(--text-muted);">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

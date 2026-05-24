@@ -1,0 +1,634 @@
+{% extends 'base.html' %}
+{% block title %}Sorteio de Grupos — {{ tournament.name }}{% endblock %}
+
+{% block content %}
+<style>
+/* ─── Draw Page ─────────────────────────────────────────────── */
+.draw-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+
+/* Pool (equipas sem grupo) */
+.draw-pool {
+  min-width: 200px;
+  flex-shrink: 0;
+}
+.draw-pool-title {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+
+/* Group column */
+.draw-group-col {
+  min-width: 200px;
+  flex-shrink: 0;
+}
+.draw-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+.draw-group-label {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--neon-glow);
+  letter-spacing: 0.05em;
+}
+.draw-group-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+.draw-group-count.full {
+  color: var(--success);
+  border-color: rgba(16,185,129,0.4);
+  background: rgba(16,185,129,0.08);
+}
+
+/* Drop zone */
+.drop-zone-group {
+  min-height: 120px;
+  background: var(--bg-card);
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 8px;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.drop-zone-group.drag-over {
+  border-color: var(--neon);
+  background: rgba(37,99,235,0.06);
+  box-shadow: 0 0 16px rgba(37,99,235,0.15);
+}
+.drop-zone-group.full-zone {
+  border-color: rgba(16,185,129,0.3);
+  background: rgba(16,185,129,0.04);
+}
+.drop-zone-empty-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Team card (draggable) */
+.draw-team-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.15s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.draw-team-card:hover {
+  border-color: var(--neon);
+  box-shadow: 0 2px 12px rgba(37,99,235,0.15);
+  transform: translateY(-1px);
+}
+.draw-team-card:active {
+  cursor: grabbing;
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+.draw-team-card.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+.draw-team-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+.draw-team-logo-placeholder {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: white;
+  flex-shrink: 0;
+}
+.draw-team-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.draw-team-drag-handle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+/* Action bar */
+.draw-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.draw-status {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+.draw-status .count-ok { color: var(--success); font-weight: 700; }
+.draw-status .count-warn { color: var(--warning); font-weight: 700; }
+
+/* Save feedback */
+#save-feedback {
+  display: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+}
+#save-feedback.ok { background: rgba(16,185,129,0.15); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+#save-feedback.err { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+
+/* Group colors */
+.group-color-A { --gc: #2563eb; }
+.group-color-B { --gc: #7c3aed; }
+.group-color-C { --gc: #059669; }
+.group-color-D { --gc: #d97706; }
+.group-color-E { --gc: #dc2626; }
+.group-color-F { --gc: #0891b2; }
+.group-color-G { --gc: #65a30d; }
+.group-color-H { --gc: #9333ea; }
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">🎲 Sorteio de Grupos</div>
+    <div class="page-subtitle">
+      {{ tournament.name }} ·
+      {{ tournament.groups_count or 2 }} grupos ·
+      {{ tournament.teams_per_group or '?' }} equipas por grupo
+    </div>
+  </div>
+  <a href="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}"
+     class="btn btn-secondary">← Voltar ao Torneio</a>
+</div>
+
+<!-- Action bar -->
+<div class="draw-actions">
+  <button class="btn btn-secondary btn-sm" onclick="randomDraw()">
+    🎲 Sorteio Aleatório
+  </button>
+  <button class="btn btn-secondary btn-sm" onclick="clearAll()">
+    🗑️ Limpar Tudo
+  </button>
+  <button class="btn btn-primary" onclick="saveGroups()" id="save-btn">
+    💾 Guardar Grupos
+  </button>
+  <span id="save-feedback"></span>
+  <div class="draw-status">
+    Distribuídas: <span id="assigned-count" class="count-warn">0</span> /
+    <span id="total-count">{{ registered_teams|length }}</span> equipas
+  </div>
+</div>
+
+<!-- Draw layout -->
+<div class="draw-layout" id="draw-layout">
+
+  <!-- Pool: unassigned teams -->
+  <div class="draw-pool">
+    <div class="draw-pool-title">🏃 Sem Grupo</div>
+    <div class="drop-zone-group" id="pool"
+         ondragover="onDragOver(event)"
+         ondragleave="onDragLeave(event)"
+         ondrop="onDrop(event, null)">
+      <div class="drop-zone-empty-hint" id="pool-hint" style="display:none;">Arrasta aqui</div>
+      {% for tt in registered_teams %}
+      {% if not tt.group_letter %}
+      <div class="draw-team-card"
+           id="team-{{ tt.team_id }}"
+           draggable="true"
+           data-team-id="{{ tt.team_id }}"
+           data-team-name="{{ tt.team.name }}"
+           ondragstart="onDragStart(event, {{ tt.team_id }})"
+           ondragend="onDragEnd(event)">
+        {% if tt.team.logo_url %}
+        <img src="{{ url_for('static', filename=tt.team.logo_url) }}" class="draw-team-logo" />
+        {% else %}
+        <div class="draw-team-logo-placeholder"
+             style="background:{{ tt.team.primary_color or '#2563eb' }};color:{{ tt.team.secondary_color or '#fff' }};">
+          {{ tt.team.initials }}
+        </div>
+        {% endif %}
+        <span class="draw-team-name">{{ tt.team.name }}</span>
+        <span class="draw-team-drag-handle">⠿</span>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Group columns -->
+  {% set letters = ['A','B','C','D','E','F','G','H'] %}
+  {% for i in range(tournament.groups_count or 2) %}
+  {% set letter = letters[i] %}
+  {% set tpg = tournament.teams_per_group or 4 %}
+  {% set group_teams = registered_teams | selectattr('group_letter','equalto',letter) | list %}
+  <div class="draw-group-col group-color-{{ letter }}">
+    <div class="draw-group-header">
+      <div class="draw-group-label" style="color:var(--gc, var(--neon-glow));">
+        Grupo {{ letter }}
+      </div>
+      <div class="draw-group-count {{ 'full' if group_teams|length >= tpg else '' }}"
+           id="count-{{ letter }}">
+        {{ group_teams|length }}/{{ tpg }}
+      </div>
+    </div>
+    <div class="drop-zone-group {{ 'full-zone' if group_teams|length >= tpg else '' }}"
+         id="group-{{ letter }}"
+         data-group="{{ letter }}"
+         data-max="{{ tpg }}"
+         ondragover="onDragOver(event)"
+         ondragleave="onDragLeave(event)"
+         ondrop="onDrop(event, '{{ letter }}')">
+      {% if group_teams %}
+      {% for tt in group_teams %}
+      <div class="draw-team-card"
+           id="team-{{ tt.team_id }}"
+           draggable="true"
+           data-team-id="{{ tt.team_id }}"
+           data-team-name="{{ tt.team.name }}"
+           ondragstart="onDragStart(event, {{ tt.team_id }})"
+           ondragend="onDragEnd(event)">
+        {% if tt.team.logo_url %}
+        <img src="{{ url_for('static', filename=tt.team.logo_url) }}" class="draw-team-logo" />
+        {% else %}
+        <div class="draw-team-logo-placeholder"
+             style="background:{{ tt.team.primary_color or '#2563eb' }};color:{{ tt.team.secondary_color or '#fff' }};">
+          {{ tt.team.initials }}
+        </div>
+        {% endif %}
+        <span class="draw-team-name">{{ tt.team.name }}</span>
+        <span class="draw-team-drag-handle">⠿</span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="drop-zone-empty-hint">Arrasta equipas aqui</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- Hidden data -->
+<div id="tournament-id" data-id="{{ tournament.id }}" style="display:none;"></div>
+<div id="groups-count" data-count="{{ tournament.groups_count or 2 }}" style="display:none;"></div>
+<div id="tpg" data-tpg="{{ tournament.teams_per_group or 4 }}" style="display:none;"></div>
+
+<script>
+const TOURNAMENT_ID = {{ tournament.id }};
+const GROUPS_COUNT  = {{ tournament.groups_count or 2 }};
+const TPG           = {{ tournament.teams_per_group or 4 }};
+const LETTERS       = ['A','B','C','D','E','F','G','H'].slice(0, GROUPS_COUNT);
+
+let draggedTeamId = null;
+
+// ─── Drag & Drop ──────────────────────────────────────────────
+
+function onDragStart(e, teamId) {
+  draggedTeamId = teamId;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', teamId);
+  setTimeout(() => {
+    const el = document.getElementById('team-' + teamId);
+    if (el) el.classList.add('dragging');
+  }, 0);
+}
+
+function onDragEnd(e) {
+  const el = document.getElementById('team-' + draggedTeamId);
+  if (el) el.classList.remove('dragging');
+  // Remove all drag-over highlights
+  document.querySelectorAll('.drop-zone-group').forEach(z => z.classList.remove('drag-over'));
+  draggedTeamId = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const zone = e.currentTarget;
+  // Check capacity
+  if (zone.id !== 'pool') {
+    const letter = zone.dataset.group;
+    const max = parseInt(zone.dataset.max) || TPG;
+    const current = zone.querySelectorAll('.draw-team-card').length;
+    if (current >= max) return; // Don't highlight if full
+  }
+  zone.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  // Only remove if leaving the zone itself (not a child)
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function onDrop(e, groupLetter) {
+  e.preventDefault();
+  e.stopPropagation();
+  const zone = e.currentTarget;
+  zone.classList.remove('drag-over');
+
+  const teamId = draggedTeamId || parseInt(e.dataTransfer.getData('text/plain'));
+  if (!teamId) return;
+
+  const teamEl = document.getElementById('team-' + teamId);
+  if (!teamEl) return;
+
+  // Check capacity for group zones
+  if (groupLetter) {
+    const max = parseInt(zone.dataset.max) || TPG;
+    const current = zone.querySelectorAll('.draw-team-card').length;
+    if (current >= max) {
+      showFeedback('Grupo ' + groupLetter + ' já está cheio (' + max + ' equipas).', 'err');
+      return;
+    }
+  }
+
+  // Remove empty hint if present
+  const hint = zone.querySelector('.drop-zone-empty-hint');
+  if (hint) hint.remove();
+
+  // Move the card
+  zone.appendChild(teamEl);
+
+  // Update counts
+  updateCounts();
+}
+
+// ─── Touch support (mobile) ───────────────────────────────────
+
+let touchDragEl = null;
+let touchClone = null;
+let touchOffsetX = 0, touchOffsetY = 0;
+
+document.addEventListener('touchstart', e => {
+  const card = e.target.closest('.draw-team-card');
+  if (!card) return;
+  touchDragEl = card;
+  const rect = card.getBoundingClientRect();
+  touchOffsetX = e.touches[0].clientX - rect.left;
+  touchOffsetY = e.touches[0].clientY - rect.top;
+
+  touchClone = card.cloneNode(true);
+  touchClone.style.cssText = `
+    position:fixed;z-index:9999;pointer-events:none;opacity:0.85;
+    width:${rect.width}px;transform:scale(1.05);
+    left:${rect.left}px;top:${rect.top}px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  `;
+  document.body.appendChild(touchClone);
+  card.style.opacity = '0.3';
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (!touchClone) return;
+  e.preventDefault();
+  const x = e.touches[0].clientX - touchOffsetX;
+  const y = e.touches[0].clientY - touchOffsetY;
+  touchClone.style.left = x + 'px';
+  touchClone.style.top = y + 'px';
+
+  // Highlight drop zone under finger
+  touchClone.style.display = 'none';
+  const el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+  touchClone.style.display = '';
+  document.querySelectorAll('.drop-zone-group').forEach(z => z.classList.remove('drag-over'));
+  const zone = el?.closest('.drop-zone-group');
+  if (zone) zone.classList.add('drag-over');
+}, { passive: false });
+
+document.addEventListener('touchend', e => {
+  if (!touchClone || !touchDragEl) return;
+  touchClone.remove();
+  touchClone = null;
+  touchDragEl.style.opacity = '';
+
+  const x = e.changedTouches[0].clientX;
+  const y = e.changedTouches[0].clientY;
+  touchDragEl.style.display = 'none';
+  const el = document.elementFromPoint(x, y);
+  touchDragEl.style.display = '';
+
+  document.querySelectorAll('.drop-zone-group').forEach(z => z.classList.remove('drag-over'));
+
+  const zone = el?.closest('.drop-zone-group');
+  if (zone) {
+    const groupLetter = zone.dataset.group || null;
+    if (groupLetter) {
+      const max = parseInt(zone.dataset.max) || TPG;
+      const current = zone.querySelectorAll('.draw-team-card').length;
+      if (current >= max) {
+        showFeedback('Grupo ' + groupLetter + ' já está cheio.', 'err');
+        touchDragEl = null;
+        return;
+      }
+    }
+    const hint = zone.querySelector('.drop-zone-empty-hint');
+    if (hint) hint.remove();
+    zone.appendChild(touchDragEl);
+    updateCounts();
+  }
+  touchDragEl = null;
+});
+
+// ─── Counts ───────────────────────────────────────────────────
+
+function updateCounts() {
+  let assigned = 0;
+  LETTERS.forEach(letter => {
+    const zone = document.getElementById('group-' + letter);
+    if (!zone) return;
+    const count = zone.querySelectorAll('.draw-team-card').length;
+    const max = parseInt(zone.dataset.max) || TPG;
+    assigned += count;
+
+    const countEl = document.getElementById('count-' + letter);
+    if (countEl) {
+      countEl.textContent = count + '/' + max;
+      countEl.classList.toggle('full', count >= max);
+    }
+    zone.classList.toggle('full-zone', count >= max);
+
+    // Show/hide empty hint
+    let hint = zone.querySelector('.drop-zone-empty-hint');
+    if (count === 0) {
+      if (!hint) {
+        hint = document.createElement('div');
+        hint.className = 'drop-zone-empty-hint';
+        hint.textContent = 'Arrasta equipas aqui';
+        zone.appendChild(hint);
+      }
+    } else if (hint) {
+      hint.remove();
+    }
+  });
+
+  const total = document.querySelectorAll('.draw-team-card').length;
+  const countEl = document.getElementById('assigned-count');
+  if (countEl) {
+    countEl.textContent = assigned;
+    countEl.className = assigned === total ? 'count-ok' : 'count-warn';
+  }
+
+  // Pool hint
+  const pool = document.getElementById('pool');
+  const poolHint = document.getElementById('pool-hint');
+  if (pool && poolHint) {
+    poolHint.style.display = pool.querySelectorAll('.draw-team-card').length === 0 ? 'flex' : 'none';
+  }
+}
+
+// ─── Random draw ──────────────────────────────────────────────
+
+function randomDraw() {
+  // Collect all team cards
+  const allCards = Array.from(document.querySelectorAll('.draw-team-card'));
+  // Shuffle
+  for (let i = allCards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allCards[i], allCards[j]] = [allCards[j], allCards[i]];
+  }
+
+  // Clear all zones
+  LETTERS.forEach(letter => {
+    const zone = document.getElementById('group-' + letter);
+    if (zone) {
+      zone.querySelectorAll('.draw-team-card').forEach(c => c.remove());
+    }
+  });
+  const pool = document.getElementById('pool');
+  pool.querySelectorAll('.draw-team-card').forEach(c => c.remove());
+
+  // Distribute round-robin
+  allCards.forEach((card, idx) => {
+    const letter = LETTERS[idx % GROUPS_COUNT];
+    const zone = document.getElementById('group-' + letter);
+    if (zone) {
+      const hint = zone.querySelector('.drop-zone-empty-hint');
+      if (hint) hint.remove();
+      zone.appendChild(card);
+    }
+  });
+
+  updateCounts();
+  showFeedback('Sorteio aleatório realizado! Clica em Guardar para confirmar.', 'ok');
+}
+
+// ─── Clear all ────────────────────────────────────────────────
+
+function clearAll() {
+  const pool = document.getElementById('pool');
+  LETTERS.forEach(letter => {
+    const zone = document.getElementById('group-' + letter);
+    if (!zone) return;
+    zone.querySelectorAll('.draw-team-card').forEach(card => {
+      pool.appendChild(card);
+    });
+  });
+  updateCounts();
+}
+
+// ─── Save ─────────────────────────────────────────────────────
+
+function saveGroups() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ A guardar...';
+
+  // Build assignment map
+  const assignments = {};
+  LETTERS.forEach(letter => {
+    const zone = document.getElementById('group-' + letter);
+    if (!zone) return;
+    zone.querySelectorAll('.draw-team-card').forEach(card => {
+      assignments[card.dataset.teamId] = letter;
+    });
+  });
+
+  // Pool teams get null
+  document.getElementById('pool').querySelectorAll('.draw-team-card').forEach(card => {
+    assignments[card.dataset.teamId] = null;
+  });
+
+  fetch('/tournaments/' + TOURNAMENT_ID + '/draw/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ assignments })
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar Grupos';
+    if (data.ok) {
+      showFeedback('✅ Grupos guardados com sucesso!', 'ok');
+    } else {
+      showFeedback('❌ Erro: ' + (data.error || 'Tenta novamente.'), 'err');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = '💾 Guardar Grupos';
+    showFeedback('❌ Erro de ligação.', 'err');
+  });
+}
+
+function showFeedback(msg, type) {
+  const el = document.getElementById('save-feedback');
+  el.textContent = msg;
+  el.className = type;
+  el.style.display = 'inline-flex';
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+updateCounts();
+</script>
+{% endblock %}

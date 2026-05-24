@@ -1,0 +1,584 @@
+﻿<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bracket — {{ tournament.name }}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      background: #070b14;
+      color: #f0f4ff;
+      min-height: 100vh;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #070b14; }
+    ::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 3px; }
+
+    .page-bg {
+      background: #070b14;
+      background-image:
+        radial-gradient(ellipse at 50% 0%, rgba(37,99,235,0.1) 0%, transparent 60%),
+        radial-gradient(ellipse at 20% 80%, rgba(6,182,212,0.05) 0%, transparent 50%);
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* Header */
+    .bracket-header {
+      text-align: center;
+      padding: 32px 40px 24px;
+      border-bottom: 1px solid #1e3a5f;
+      background: linear-gradient(180deg, #0d1526 0%, transparent 100%);
+      position: relative;
+    }
+    .bracket-header-back {
+      position: absolute;
+      left: 24px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.8rem;
+      color: #4b6080;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: color 0.2s;
+    }
+    .bracket-header-back:hover { color: #3b82f6; }
+    .bracket-logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 2px solid #1e3a5f;
+      margin: 0 auto 12px;
+      display: block;
+    }
+    .bracket-logo-placeholder {
+      width: 72px;
+      height: 72px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #2563eb, #06b6d4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 12px;
+    }
+    .bracket-tournament-name {
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: #f0f4ff;
+      letter-spacing: 0.03em;
+    }
+    .bracket-tournament-sub {
+      font-size: 0.75rem;
+      color: #4b6080;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+
+    /* Bracket layout */
+    .bracket-wrapper {
+      padding: 32px 20px;
+      overflow-x: auto;
+    }
+    .bracket-layout {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      min-width: fit-content;
+      margin: 0 auto;
+    }
+
+    /* Phase column */
+    .phase-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 180px;
+    }
+    .phase-col.center-col {
+      min-width: 100px;
+      align-items: center;
+      justify-content: center;
+    }
+    .phase-label {
+      font-size: 0.6rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #4b6080;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .phase-label.final-label {
+      color: #f59e0b;
+      font-size: 0.7rem;
+    }
+    .matches-col {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+    }
+
+    /* Match slot */
+    .bracket-match {
+      background: #111d35;
+      border: 1px solid #1e3a5f;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 6px 8px;
+      transition: all 0.2s;
+      position: relative;
+      min-width: 160px;
+    }
+    .bracket-match:hover {
+      border-color: #2563eb;
+      box-shadow: 0 0 16px rgba(37,99,235,0.15);
+    }
+    .bracket-match.finished { border-color: rgba(16,185,129,0.4); }
+    .bracket-match.live { border-color: rgba(239,68,68,0.5); animation: live-pulse 2s infinite; }
+    @keyframes live-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.3)} 50%{box-shadow:0 0 0 6px rgba(239,68,68,0)} }
+
+    .bracket-team {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+    }
+    .bracket-team + .bracket-team {
+      border-top: 1px solid rgba(30,58,95,0.5);
+    }
+    .bracket-team-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+    .bracket-team-placeholder {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.5rem;
+      font-weight: 900;
+      color: white;
+      flex-shrink: 0;
+    }
+    .bracket-team-name {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #f0f4ff;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .bracket-team-name.tbd { color: #4b6080; font-style: italic; }
+    .bracket-team-score {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: #3b82f6;
+      min-width: 16px;
+      text-align: right;
+    }
+    .bracket-team-score.winner { color: #10b981; }
+
+    /* Connector lines */
+    .connector-col {
+      display: flex;
+      flex-direction: column;
+      width: 20px;
+      flex-shrink: 0;
+    }
+    .connector-segment {
+      flex: 1;
+      border-right: 2px solid #1e3a5f;
+      position: relative;
+    }
+    .connector-segment.top { border-bottom: 2px solid #1e3a5f; }
+    .connector-segment.bottom { border-top: 2px solid #1e3a5f; }
+    .connector-h {
+      width: 20px;
+      height: 2px;
+      background: #1e3a5f;
+      align-self: center;
+    }
+
+    /* Trophy center */
+    .trophy-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      min-width: 80px;
+    }
+    .trophy-icon {
+      font-size: 3rem;
+      filter: drop-shadow(0 0 20px rgba(245,158,11,0.6));
+      animation: trophy-glow 3s ease-in-out infinite;
+    }
+    @keyframes trophy-glow {
+      0%,100% { filter: drop-shadow(0 0 20px rgba(245,158,11,0.6)); }
+      50% { filter: drop-shadow(0 0 40px rgba(245,158,11,0.9)); }
+    }
+    .trophy-label {
+      font-size: 0.55rem;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #f59e0b;
+      margin-top: 6px;
+    }
+
+    /* Final match special styling */
+    .bracket-match.final-match {
+      border-color: rgba(245,158,11,0.4);
+      background: linear-gradient(135deg, #111d35, #1a1a0a);
+      min-width: 180px;
+    }
+    .bracket-match.final-match:hover {
+      border-color: #f59e0b;
+      box-shadow: 0 0 24px rgba(245,158,11,0.2);
+    }
+
+    /* Legend */
+    .bracket-legend {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(30,58,95,0.3);
+      margin-top: 16px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: #4b6080;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      border: 2px solid;
+    }
+    .legend-dot.finished { border-color: #10b981; }
+    .legend-dot.live { border-color: #ef4444; }
+    .legend-dot.scheduled { border-color: #1e3a5f; }
+
+    /* Empty state */
+    .bracket-empty {
+      text-align: center;
+      padding: 80px 20px;
+      color: #4b6080;
+    }
+    .bracket-empty .empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.5; }
+
+    /* Mobile: vertical list */
+    @media (max-width: 768px) {
+      .bracket-layout { display: none; }
+      .bracket-mobile { display: block; }
+    }
+    @media (min-width: 769px) {
+      .bracket-mobile { display: none; }
+    }
+    .bracket-mobile-phase {
+      margin-bottom: 28px;
+    }
+    .bracket-mobile-phase-label {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #4b6080;
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+    .bracket-mobile-match {
+      background: #111d35;
+      border: 1px solid #1e3a5f;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+    }
+    .bracket-mobile-match.finished { border-color: rgba(16,185,129,0.4); }
+    .bracket-mobile-match.live { border-color: rgba(239,68,68,0.5); }
+  </style>
+</head>
+<body>
+<div class="page-bg">
+
+  <!-- Header -->
+  <div class="bracket-header">
+    <a href="/tournaments/{{ tournament.id }}" class="bracket-header-back">← Voltar ao Torneio</a>
+    {% if tournament.logo_url %}
+    <img src="/static/{{ tournament.logo_url }}" class="bracket-logo" alt="{{ tournament.name }}" />
+    {% else %}
+    <div class="bracket-logo-placeholder">🏆</div>
+    {% endif %}
+    <div class="bracket-tournament-name">{{ tournament.name }}</div>
+    <div class="bracket-tournament-sub">⚔️ Bracket Eliminatório · {{ tournament.start_date or '' }}</div>
+  </div>
+
+  {% if bracket_data %}
+
+  <!-- Desktop Bracket -->
+  <div class="bracket-wrapper">
+    <div class="bracket-layout">
+
+      {% set phases_left = [] %}
+      {% set phases_right = [] %}
+      {% set has_final = 'final' in bracket_data %}
+
+      {# Build left side: all phases except final in order #}
+      {% for phase_key in phase_order %}
+        {% if phase_key != 'final' %}
+          {% set _ = phases_left.append(phase_key) %}
+        {% endif %}
+      {% endfor %}
+
+      {# Left side phases #}
+      {% for phase_key in phases_left %}
+      {% set phase = bracket_data[phase_key] %}
+      <div class="phase-col">
+        <div class="phase-label">{{ phase.label }}</div>
+        <div class="matches-col">
+          {% for m in phase.matches %}
+          <div class="bracket-match {{ m.status }}">
+            <!-- Team 1 -->
+            <div class="bracket-team">
+              {% if m.team1 and m.team1.logo_url %}
+              <img src="/static/{{ m.team1.logo_url }}" class="bracket-team-logo" />
+              {% elif m.team1 %}
+              <div class="bracket-team-placeholder" style="background:{{ m.team1.primary_color or '#2563eb' }};">{{ m.team1.initials }}</div>
+              {% else %}
+              <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+              {% endif %}
+              <span class="bracket-team-name {{ 'tbd' if not m.team1 or m.team1_id == 1 }}">
+                {{ m.team1.name if m.team1 and m.team1_id != 1 else 'A Definir' }}
+              </span>
+              {% if m.status == 'finished' %}
+              <span class="bracket-team-score {{ 'winner' if m.score1 > m.score2 else '' }}">{{ m.score1 }}</span>
+              {% endif %}
+            </div>
+            <!-- Team 2 -->
+            <div class="bracket-team">
+              {% if m.team2 and m.team2.logo_url %}
+              <img src="/static/{{ m.team2.logo_url }}" class="bracket-team-logo" />
+              {% elif m.team2 %}
+              <div class="bracket-team-placeholder" style="background:{{ m.team2.primary_color or '#2563eb' }};">{{ m.team2.initials }}</div>
+              {% else %}
+              <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+              {% endif %}
+              <span class="bracket-team-name {{ 'tbd' if not m.team2 or m.team2_id == 1 }}">
+                {{ m.team2.name if m.team2 and m.team2_id != 1 else 'A Definir' }}
+              </span>
+              {% if m.status == 'finished' %}
+              <span class="bracket-team-score {{ 'winner' if m.score2 > m.score1 else '' }}">{{ m.score2 }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <!-- Connector -->
+      <div class="connector-col">
+        {% for m in phase.matches %}
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div style="flex:1;border-right:2px solid #1e3a5f;border-bottom:2px solid #1e3a5f;margin:6px 0 0;"></div>
+          <div style="flex:1;border-right:2px solid #1e3a5f;border-top:2px solid #1e3a5f;margin:0 0 6px;"></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      {# Center: Final + Trophy #}
+      <div class="phase-col center-col" style="align-items:center;justify-content:center;">
+        {% if has_final %}
+        <div class="phase-label final-label">🏆 FINAL</div>
+        {% for m in bracket_data['final'].matches %}
+        <div class="bracket-match final-match {{ m.status }}">
+          <div class="bracket-team">
+            {% if m.team1 and m.team1.logo_url %}
+            <img src="/static/{{ m.team1.logo_url }}" class="bracket-team-logo" />
+            {% elif m.team1 %}
+            <div class="bracket-team-placeholder" style="background:{{ m.team1.primary_color or '#2563eb' }};">{{ m.team1.initials }}</div>
+            {% else %}
+            <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+            {% endif %}
+            <span class="bracket-team-name {{ 'tbd' if not m.team1 or m.team1_id == 1 }}">
+              {{ m.team1.name if m.team1 and m.team1_id != 1 else 'A Definir' }}
+            </span>
+            {% if m.status == 'finished' %}
+            <span class="bracket-team-score {{ 'winner' if m.score1 > m.score2 else '' }}">{{ m.score1 }}</span>
+            {% endif %}
+          </div>
+          <div class="bracket-team">
+            {% if m.team2 and m.team2.logo_url %}
+            <img src="/static/{{ m.team2.logo_url }}" class="bracket-team-logo" />
+            {% elif m.team2 %}
+            <div class="bracket-team-placeholder" style="background:{{ m.team2.primary_color or '#2563eb' }};">{{ m.team2.initials }}</div>
+            {% else %}
+            <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+            {% endif %}
+            <span class="bracket-team-name {{ 'tbd' if not m.team2 or m.team2_id == 1 }}">
+              {{ m.team2.name if m.team2 and m.team2_id != 1 else 'A Definir' }}
+            </span>
+            {% if m.status == 'finished' %}
+            <span class="bracket-team-score {{ 'winner' if m.score2 > m.score1 else '' }}">{{ m.score2 }}</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        <div class="trophy-center" style="margin-top:16px;">
+          <div class="trophy-icon">🏆</div>
+          <div class="trophy-label">Campeão</div>
+        </div>
+      </div>
+
+      {# Right side: mirror of left phases in reverse #}
+      {% for phase_key in phases_left|reverse %}
+      {% set phase = bracket_data[phase_key] %}
+      <!-- Connector right -->
+      <div class="connector-col">
+        {% for m in phase.matches %}
+        <div style="flex:1;display:flex;flex-direction:column;">
+          <div style="flex:1;border-left:2px solid #1e3a5f;border-bottom:2px solid #1e3a5f;margin:6px 0 0;"></div>
+          <div style="flex:1;border-left:2px solid #1e3a5f;border-top:2px solid #1e3a5f;margin:0 0 6px;"></div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="phase-col">
+        <div class="phase-label">{{ phase.label }}</div>
+        <div class="matches-col">
+          {% for m in phase.matches %}
+          <div class="bracket-match {{ m.status }}">
+            <div class="bracket-team">
+              {% if m.team1 and m.team1.logo_url %}
+              <img src="/static/{{ m.team1.logo_url }}" class="bracket-team-logo" />
+              {% elif m.team1 %}
+              <div class="bracket-team-placeholder" style="background:{{ m.team1.primary_color or '#2563eb' }};">{{ m.team1.initials }}</div>
+              {% else %}
+              <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+              {% endif %}
+              <span class="bracket-team-name {{ 'tbd' if not m.team1 or m.team1_id == 1 }}">
+                {{ m.team1.name if m.team1 and m.team1_id != 1 else 'A Definir' }}
+              </span>
+              {% if m.status == 'finished' %}
+              <span class="bracket-team-score {{ 'winner' if m.score1 > m.score2 else '' }}">{{ m.score1 }}</span>
+              {% endif %}
+            </div>
+            <div class="bracket-team">
+              {% if m.team2 and m.team2.logo_url %}
+              <img src="/static/{{ m.team2.logo_url }}" class="bracket-team-logo" />
+              {% elif m.team2 %}
+              <div class="bracket-team-placeholder" style="background:{{ m.team2.primary_color or '#2563eb' }};">{{ m.team2.initials }}</div>
+              {% else %}
+              <div class="bracket-team-placeholder" style="background:#1e3a5f;">?</div>
+              {% endif %}
+              <span class="bracket-team-name {{ 'tbd' if not m.team2 or m.team2_id == 1 }}">
+                {{ m.team2.name if m.team2 and m.team2_id != 1 else 'A Definir' }}
+              </span>
+              {% if m.status == 'finished' %}
+              <span class="bracket-team-score {{ 'winner' if m.score2 > m.score1 else '' }}">{{ m.score2 }}</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+
+    </div><!-- end bracket-layout -->
+  </div><!-- end bracket-wrapper -->
+
+  <!-- Mobile: vertical list -->
+  <div class="bracket-mobile" style="padding:20px;">
+    {% for phase_key in phase_order %}
+    {% set phase = bracket_data[phase_key] %}
+    <div class="bracket-mobile-phase">
+      <div class="bracket-mobile-phase-label">
+        {% if phase_key == 'final' %}🏆{% elif phase_key == 'semi' %}🔥{% else %}⚔️{% endif %}
+        {{ phase.label }}
+      </div>
+      {% for m in phase.matches %}
+      <div class="bracket-mobile-match {{ m.status }}">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;">
+            {% if m.team1 and m.team1.logo_url %}
+            <img src="/static/{{ m.team1.logo_url }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" />
+            {% elif m.team1 %}
+            <div style="width:28px;height:28px;border-radius:50%;background:{{ m.team1.primary_color or '#2563eb' }};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:900;color:white;">{{ m.team1.initials }}</div>
+            {% endif %}
+            <span style="font-size:0.85rem;font-weight:600;color:{{ '#f0f4ff' if m.team1 and m.team1_id != 1 else '#4b6080' }};">
+              {{ m.team1.name if m.team1 and m.team1_id != 1 else 'A Definir' }}
+            </span>
+          </div>
+          <div style="text-align:center;min-width:60px;">
+            {% if m.status == 'finished' %}
+            <span style="font-size:1rem;font-weight:800;color:#f0f4ff;">{{ m.score1 }} — {{ m.score2 }}</span>
+            {% else %}
+            <span style="font-size:0.75rem;color:#4b6080;">vs</span>
+            {% endif %}
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex:1;flex-direction:row-reverse;">
+            {% if m.team2 and m.team2.logo_url %}
+            <img src="/static/{{ m.team2.logo_url }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" />
+            {% elif m.team2 %}
+            <div style="width:28px;height:28px;border-radius:50%;background:{{ m.team2.primary_color or '#2563eb' }};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:900;color:white;">{{ m.team2.initials }}</div>
+            {% endif %}
+            <span style="font-size:0.85rem;font-weight:600;color:{{ '#f0f4ff' if m.team2 and m.team2_id != 1 else '#4b6080' }};text-align:right;">
+              {{ m.team2.name if m.team2 and m.team2_id != 1 else 'A Definir' }}
+            </span>
+          </div>
+        </div>
+        {% if m.date %}
+        <div style="text-align:center;margin-top:8px;font-size:0.72rem;color:#06b6d4;">{{ m.date }}{% if m.time %} · {{ m.time }}{% endif %}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Legend -->
+  <div class="bracket-legend">
+    <div class="legend-item"><div class="legend-dot finished"></div> Terminado</div>
+    <div class="legend-item"><div class="legend-dot live"></div> Ao Vivo</div>
+    <div class="legend-item"><div class="legend-dot scheduled"></div> Agendado</div>
+  </div>
+
+  {% else %}
+  <div class="bracket-empty">
+    <div class="empty-icon">⚔️</div>
+    <p>Nenhuma fase eliminatória gerada ainda.</p>
+    <p style="margin-top:8px;font-size:0.8rem;">O bracket aparece aqui quando o calendário for gerado.</p>
+  </div>
+  {% endif %}
+
+  <!-- Footer -->
+  <div style="text-align:center;padding:24px 20px 0;">
+    <a href="/tournaments/{{ tournament.id }}" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;border-radius:8px;background:#111d35;border:1px solid #1e3a5f;color:#94a3b8;text-decoration:none;font-size:0.85rem;font-weight:600;transition:all 0.2s;">
+      🏆 Ver Torneio Completo
+    </a>
+  </div>
+
+</div>
+</body>
+</html>

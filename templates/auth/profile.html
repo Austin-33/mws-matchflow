@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% block title %}Meu Perfil — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">👤 Meu Perfil</div>
+    <div class="page-subtitle">Gere as tuas credenciais e dados de conta.</div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px;">
+
+  <!-- ─── Identidade ─────────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- ID Card -->
+    <div class="card" style="border-color: var(--neon); background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));">
+      <div class="card-title">🪪 Identificação</div>
+
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+        <div style="width: 56px; height: 56px; border-radius: 50%;
+             background: linear-gradient(135deg, var(--neon), var(--accent));
+             display: flex; align-items: center; justify-content: center;
+             font-size: 1.4rem; font-weight: 900; color: white; flex-shrink: 0;">
+          {{ current_user.display_name[0].upper() }}
+        </div>
+        <div>
+          <div style="font-size: 1.1rem; font-weight: 800;">{{ current_user.display_name }}</div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);">@{{ current_user.username }}</div>
+          <span style="font-size: 0.7rem; background: rgba(37,99,235,0.15); color: var(--neon-glow);
+                       padding: 2px 8px; border-radius: 4px; margin-top: 4px; display: inline-block;">
+            {{ current_user.role_label }}
+          </span>
+        </div>
+      </div>
+
+      {% set id_rows = [
+        ('🆔 ID Público', current_user.public_id),
+        ('📧 Email', current_user.email),
+        ('📅 Registado em', current_user.created_at.strftime('%d/%m/%Y %H:%M') if current_user.created_at else '—'),
+        ('🕐 Último login', current_user.last_login.strftime('%d/%m/%Y %H:%M') if current_user.last_login else 'Esta sessão'),
+        ('🔑 Última alteração de password', current_user.last_password_change.strftime('%d/%m/%Y %H:%M') if current_user.last_password_change else '—'),
+      ] %}
+      {% for label, val in id_rows %}
+      <div style="display: flex; justify-content: space-between; align-items: center;
+                  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.82rem;">
+        <span style="color: var(--text-muted);">{{ label }}</span>
+        <span style="font-weight: 600; font-family: {% if 'ID' in label %}monospace{% endif %};
+                     font-size: {% if 'ID' in label %}0.72rem{% endif %};
+                     color: {% if 'ID' in label %}var(--neon-glow){% else %}var(--text-primary){% endif %};">
+          {{ val }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Editar Perfil -->
+    <div class="card">
+      <div class="card-title">✏️ Editar Perfil</div>
+      <form method="POST" action="{{ url_for('auth.profile') }}">
+        <input type="hidden" name="action" value="update_profile" />
+        <div class="form-group">
+          <label class="form-label">Nome Completo</label>
+          <input type="text" name="full_name" class="form-control"
+                 value="{{ current_user.full_name or '' }}" placeholder="O teu nome completo" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ current_user.email }}" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">💾 Guardar Perfil</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- ─── Segurança ─────────────────────────────────────────── -->
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+
+    <!-- Alterar Password -->
+    <div class="card" style="border-color: var(--accent);">
+      <div class="card-title">🔐 Alterar Password</div>
+      <form method="POST" action="{{ url_for('auth.profile') }}" id="pw-form">
+        <input type="hidden" name="action" value="change_password" />
+
+        <div class="form-group">
+          <label class="form-label">Password Atual</label>
+          <div style="position: relative;">
+            <input type="password" name="current_password" id="pw-current" class="form-control"
+                   placeholder="A tua password atual" required style="padding-right: 44px;"
+                   autocomplete="current-password" />
+            <button type="button" onclick="togglePw('pw-current', this)"
+                    style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                           background: none; border: none; cursor: pointer; color: var(--text-muted);">👁</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Nova Password</label>
+          <div style="position: relative;">
+            <input type="password" name="new_password" id="pw-new" class="form-control"
+                   placeholder="Mínimo 6 caracteres" required minlength="6"
+                   style="padding-right: 44px;"
+                   oninput="checkStrength(this.value); checkMatch()"
+                   autocomplete="new-password" />
+            <button type="button" onclick="togglePw('pw-new', this)"
+                    style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                           background: none; border: none; cursor: pointer; color: var(--text-muted);">👁</button>
+          </div>
+          <div style="margin-top: 6px;">
+            <div style="height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;">
+              <div id="strength-bar" style="height: 100%; width: 0; transition: 0.3s; border-radius: 2px;"></div>
+            </div>
+            <div id="strength-label" style="font-size: 0.7rem; margin-top: 3px;"></div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirmar Nova Password</label>
+          <div style="position: relative;">
+            <input type="password" name="confirm_password" id="pw-confirm" class="form-control"
+                   placeholder="Repete a nova password" required
+                   style="padding-right: 44px;"
+                   oninput="checkMatch()"
+                   autocomplete="new-password" />
+            <button type="button" onclick="togglePw('pw-confirm', this)"
+                    style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                           background: none; border: none; cursor: pointer; color: var(--text-muted);">👁</button>
+          </div>
+          <div id="match-hint" style="font-size: 0.72rem; margin-top: 4px;"></div>
+        </div>
+
+        <div style="background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.2);
+                    border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px;
+                    font-size: 0.78rem; color: var(--text-muted);">
+          ℹ️ Não podes reutilizar nenhuma das últimas 5 passwords.
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm">🔐 Alterar Password</button>
+      </form>
+    </div>
+
+    <!-- Histórico de passwords -->
+    <div class="card">
+      <div class="card-title">📋 Histórico de Passwords</div>
+      {% if history %}
+      <div style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px;">
+        Últimas {{ history | length }} alterações registadas.
+      </div>
+      {% for h in history %}
+      <div style="display: flex; justify-content: space-between; align-items: center;
+                  padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 0.8rem;">
+        <span style="color: var(--text-muted);">
+          {% if loop.first %}🔑 Atual{% else %}🔒 Anterior{% endif %}
+        </span>
+        <span style="font-family: monospace; font-size: 0.7rem; color: var(--text-muted);">
+          {{ h.changed_at.strftime('%d/%m/%Y %H:%M') if h.changed_at else '—' }}
+        </span>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div style="color: var(--text-muted); font-size: 0.82rem;">Nenhum histórico ainda.</div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+function checkStrength(pw) {
+  const bar = document.getElementById('strength-bar');
+  const label = document.getElementById('strength-label');
+  let score = 0;
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    { w: '20%', color: '#ef4444', text: 'Muito fraca' },
+    { w: '40%', color: '#f59e0b', text: 'Fraca' },
+    { w: '60%', color: '#eab308', text: 'Razoável' },
+    { w: '80%', color: '#22c55e', text: 'Boa' },
+    { w: '100%', color: '#10b981', text: '💪 Forte' },
+  ];
+  const lvl = levels[Math.min(score - 1, 4)] || levels[0];
+  bar.style.width = pw.length ? lvl.w : '0';
+  bar.style.background = lvl.color;
+  label.textContent = pw.length ? lvl.text : '';
+  label.style.color = lvl.color;
+}
+function checkMatch() {
+  const pw1 = document.getElementById('pw-new').value;
+  const pw2 = document.getElementById('pw-confirm').value;
+  const hint = document.getElementById('match-hint');
+  if (!pw2) { hint.textContent = ''; return; }
+  hint.style.color = pw1 === pw2 ? 'var(--success)' : 'var(--danger)';
+  hint.textContent = pw1 === pw2 ? '✅ Passwords coincidem' : '❌ Passwords não coincidem';
+}
+</script>
+{% endblock %}

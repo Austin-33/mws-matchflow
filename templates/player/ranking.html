@@ -1,0 +1,129 @@
+﻿{% extends 'base.html' %}
+{% block title %}Ranking — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">📊 Ranking de Jogadores</div>
+    <div class="page-subtitle">Estatísticas globais de todos os jogadores.</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<form method="GET" style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: flex-end;">
+  <div>
+    <label class="form-label">Campeonato</label>
+    <select name="tournament_id" class="form-control" style="width: auto;">
+      <option value="">Todos os campeonatos</option>
+      {% for t in tournaments %}
+      <option value="{{ t.id }}" {{ 'selected' if selected_tournament == t.id }}>{{ t.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="form-label">Categoria</label>
+    <select name="category" class="form-control" style="width: auto;">
+      <option value="goals" {{ 'selected' if category == 'goals' }}>⚽ Golos</option>
+      <option value="assists" {{ 'selected' if category == 'assists' }}>🎯 Assistências</option>
+      <option value="matches_played" {{ 'selected' if category == 'matches_played' }}>🎮 Jogos</option>
+      <option value="yellow_cards" {{ 'selected' if category == 'yellow_cards' }}>🟨 Amarelos</option>
+      <option value="red_cards" {{ 'selected' if category == 'red_cards' }}>🟥 Vermelhos</option>
+    </select>
+  </div>
+  <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+</form>
+
+<!-- Tabs de categoria rápida -->
+<div class="tabs" style="margin-bottom: 24px;">
+  {% for cat, label in [('goals','⚽ Golos'), ('assists','🎯 Assist.'), ('matches_played','🎮 Jogos'), ('yellow_cards','🟨 Amarelos'), ('red_cards','🟥 Vermelhos')] %}
+  <a href="?category={{ cat }}{% if selected_tournament %}&tournament_id={{ selected_tournament }}{% endif %}"
+     class="tab-btn {{ 'active' if category == cat }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if players %}
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Jogador</th>
+        <th>Equipa</th>
+        <th>Posição</th>
+        <th>⚽ Golos</th>
+        <th>🎯 Assist.</th>
+        <th>🎮 Jogos</th>
+        <th>🟨</th>
+        <th>🟥</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in players %}
+      <tr>
+        <td>
+          <span class="rank-number {{ 'gold' if loop.index == 1 else 'silver' if loop.index == 2 else 'bronze' if loop.index == 3 else '' }}">
+            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}{% endif %}
+          </span>
+        </td>
+        <td>
+          <div class="player-info">
+            <div class="player-avatar">{{ p.name[0].upper() }}</div>
+            <div>
+              <div style="font-weight: 600;">{{ p.name }}</div>
+              {% if p.number %}<div style="font-size: 0.7rem; color: var(--text-muted);">#{{ p.number }}</div>{% endif %}
+            </div>
+          </div>
+        </td>
+        <td>
+          <a href="{{ url_for('team.team_room', team_id=p.team_id) }}"
+             style="color: var(--neon-glow); text-decoration: none; font-size: 0.85rem;">
+            {{ p.team.name }}
+          </a>
+        </td>
+        <td>
+          <span style="font-size: 0.7rem; background: rgba(37,99,235,0.1); color: var(--neon-glow);
+                       padding: 2px 8px; border-radius: 4px;">{{ p.position or '—' }}</span>
+        </td>
+        <td>
+          <span style="font-size: 1.1rem; font-weight: 800;
+                       color: {{ 'var(--success)' if category == 'goals' else 'var(--text-secondary)' }};">
+            {{ p.goals }}
+          </span>
+        </td>
+        <td>
+          <span style="font-size: 1.1rem; font-weight: 800;
+                       color: {{ 'var(--accent)' if category == 'assists' else 'var(--text-secondary)' }};">
+            {{ p.assists }}
+          </span>
+        </td>
+        <td>
+          <span style="font-size: 1.1rem; font-weight: 800;
+                       color: {{ 'var(--neon-glow)' if category == 'matches_played' else 'var(--text-secondary)' }};">
+            {{ p.matches_played }}
+          </span>
+        </td>
+        <td>
+          <span style="font-size: 1rem; font-weight: 700;
+                       color: {{ '#f59e0b' if category == 'yellow_cards' else 'var(--text-muted)' }};">
+            {{ p.yellow_cards }}
+          </span>
+        </td>
+        <td>
+          <span style="font-size: 1rem; font-weight: 700;
+                       color: {{ 'var(--danger)' if category == 'red_cards' else 'var(--text-muted)' }};">
+            {{ p.red_cards }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">📊</div>
+  <p>Nenhum jogador com estatísticas ainda.</p>
+  <a href="{{ url_for('team.list_teams') }}" class="btn btn-primary">Adicionar jogadores às equipas</a>
+</div>
+{% endif %}
+{% endblock %}

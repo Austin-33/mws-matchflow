@@ -1,0 +1,171 @@
+﻿{% extends 'base.html' %}
+{% block title %}Editar {{ team.name }} — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">✏️ Editar Equipa</div>
+    <div class="page-subtitle">{{ team.name }}</div>
+  </div>
+  <a href="{{ url_for('team.team_room', team_id=team.id) }}" class="btn btn-secondary">← Voltar</a>
+</div>
+
+<form method="POST" action="{{ url_for('team.edit_team', team_id=team.id) }}">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1000px;">
+
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div class="card">
+      <div class="card-title">🏟️ Identidade</div>
+      <div class="form-group">
+        <label class="form-label">Nome *</label>
+        <input type="text" name="name" class="form-control" value="{{ team.name }}" required />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Abreviatura</label>
+          <input type="text" name="short_name" class="form-control" value="{{ team.short_name or '' }}" maxlength="5" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modalidade</label>
+          <select name="sport" class="form-control">
+            <option value="futsal" {{ 'selected' if team.sport == 'futsal' }}>⚽ Futsal</option>
+            <option value="futebol11" {{ 'selected' if team.sport == 'futebol11' }}>🏟️ Futebol 11</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Data de Fundação</label>
+          <input type="date" name="founded_date" class="form-control" value="{{ team.founded_date or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cidade</label>
+          <input type="text" name="city" class="form-control" value="{{ team.city or '' }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">País</label>
+          <input type="text" name="country" class="form-control" value="{{ team.country or 'Portugal' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Pavilhão / Campo</label>
+          <input type="text" name="stadium" class="form-control" value="{{ team.stadium or '' }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Cor Principal</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="color" name="primary_color" value="{{ team.primary_color or '#2563eb' }}"
+                   style="width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer;" />
+            <input type="text" class="form-control" value="{{ team.primary_color or '#2563eb' }}"
+                   style="font-family: monospace;" maxlength="7"
+                   oninput="document.querySelector('[name=primary_color]').value=this.value" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cor Secundária</label>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="color" name="secondary_color" value="{{ team.secondary_color or '#ffffff' }}"
+                   style="width: 44px; height: 38px; border: 1px solid var(--border); border-radius: 6px; background: none; cursor: pointer;" />
+            <input type="text" class="form-control" value="{{ team.secondary_color or '#ffffff' }}"
+                   style="font-family: monospace;" maxlength="7"
+                   oninput="document.querySelector('[name=secondary_color]').value=this.value" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📞 Contactos</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ team.email or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Telefone</label>
+          <input type="text" name="phone" class="form-control" value="{{ team.phone or '' }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Website</label>
+          <input type="url" name="website" class="form-control" value="{{ team.website or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instagram</label>
+          <input type="text" name="instagram" class="form-control" value="{{ team.instagram or '' }}" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 20px;">
+    <div class="card">
+      <div class="card-title">👔 Direcção & Equipa Técnica</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">CEO / Presidente</label>
+          <input type="text" name="ceo" class="form-control" value="{{ team.ceo or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Diretor Desportivo</label>
+          <input type="text" name="manager" class="form-control" value="{{ team.manager or '' }}" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Treinador Principal</label>
+          <input type="text" name="coach" class="form-control" value="{{ team.coach or '' }}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Treinador Adjunto</label>
+          <input type="text" name="assistant_coach" class="form-control" value="{{ team.assistant_coach or '' }}" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Capitão</label>
+        <input type="text" name="captain" class="form-control" value="{{ team.captain or '' }}" />
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎮 Sistema de Jogo</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Formação</label>
+          <select name="formation" class="form-control">
+            <optgroup label="Futsal">
+              {% for f in formations_futsal %}
+              <option value="{{ f }}" {{ 'selected' if team.formation == f }}>{{ f }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Futebol 11">
+              {% for f in formations_football %}
+              <option value="{{ f }}" {{ 'selected' if team.formation == f }}>{{ f }}</option>
+              {% endfor %}
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tática</label>
+          <input type="text" name="tactic" class="form-control" value="{{ team.tactic or '' }}" />
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 Notas</div>
+      <textarea name="notes" class="form-control" rows="4">{{ team.notes or '' }}</textarea>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px; display: flex; gap: 12px; max-width: 1000px;">
+  <button type="submit" class="btn btn-primary">💾 Guardar Alterações</button>
+  <a href="{{ url_for('team.team_room', team_id=team.id) }}" class="btn btn-secondary">Cancelar</a>
+</div>
+</form>
+{% endblock %}

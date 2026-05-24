@@ -1,0 +1,74 @@
+﻿{% extends 'base.html' %}
+{% block title %}Login — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block auth_content %}
+<div class="auth-page">
+  <div class="auth-box">
+
+    <div class="auth-logo">
+      <div class="logo-big">AUSTIN <span>LEAGUE CORE</span></div>
+      <div class="logo-tagline">⚡ League Core Engine</div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }}">
+          {{ '✅' if category == 'success' else '❌' if category == 'error' else 'ℹ️' }} {{ message }}
+        </div>
+      {% endfor %}
+    {% endwith %}
+
+    <div class="auth-title">Entrar no sistema</div>
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <div class="form-group">
+        <label class="form-label">Username ou Email</label>
+        <input type="text" name="username" class="form-control"
+               placeholder="O teu username ou email" required autofocus autocomplete="username" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div style="position: relative;">
+          <input type="password" name="password" id="pw-input" class="form-control"
+                 placeholder="••••••••" required autocomplete="current-password"
+                 style="padding-right: 44px;" />
+          <button type="button" onclick="togglePw('pw-input', this)"
+                  style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+                         background: none; border: none; cursor: pointer; color: var(--text-muted);
+                         font-size: 1rem; padding: 0;">👁</button>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text-muted); cursor: pointer;">
+          <input type="checkbox" name="remember" style="accent-color: var(--neon); width: 14px; height: 14px;" />
+          Manter sessão
+        </label>
+        <a href="{{ url_for('auth.forgot_password') }}"
+           style="font-size: 0.8rem; color: var(--neon-glow); text-decoration: none;">
+          Esqueci a password
+        </a>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+        ⚡ Entrar
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Não tens conta? <a href="{{ url_for('auth.register') }}">Registar aqui</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+</script>
+{% endblock %}
