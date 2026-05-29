@@ -61,7 +61,7 @@ def create_post():
     if 'image' in request.files:
         img = request.files['image']
         if img and img.filename:
-            from app import allowed_file
+            from austinapp import allowed_file
             if allowed_file(img.filename):
                 ext = img.filename.rsplit('.', 1)[1].lower()
                 fname = f'feed_{uuid.uuid4().hex[:10]}.{ext}'

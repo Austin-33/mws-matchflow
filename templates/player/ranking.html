@@ -67,18 +67,36 @@
         </td>
         <td>
           <div class="player-info">
+            {% if p.photo_url %}
+            <img src="{{ url_for('static', filename=p.photo_url) }}"
+                 style="width:32px;height:32px;border-radius:50%;object-fit:cover;
+                        border:2px solid var(--border);flex-shrink:0;" />
+            {% else %}
             <div class="player-avatar">{{ p.name[0].upper() }}</div>
+            {% endif %}
             <div>
-              <div style="font-weight: 600;">{{ p.name }}</div>
+              <div style="font-weight: 600;">{{ p.display_name }}</div>
               {% if p.number %}<div style="font-size: 0.7rem; color: var(--text-muted);">#{{ p.number }}</div>{% endif %}
             </div>
           </div>
         </td>
         <td>
-          <a href="{{ url_for('team.team_room', team_id=p.team_id) }}"
-             style="color: var(--neon-glow); text-decoration: none; font-size: 0.85rem;">
-            {{ p.team.name }}
-          </a>
+          <div style="display:flex;align-items:center;gap:6px;">
+            {% if p.team.logo_url %}
+            <img src="{{ url_for('static', filename=p.team.logo_url) }}"
+                 style="width:20px;height:20px;border-radius:50%;object-fit:contain;
+                        background:var(--bg-secondary);border:1px solid var(--border);" />
+            {% else %}
+            <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;
+                 background:{{ p.team.primary_color or '#2563eb' }};
+                 display:flex;align-items:center;justify-content:center;
+                 font-size:0.45rem;font-weight:900;color:{{ p.team.secondary_color or '#fff' }};"></div>
+            {% endif %}
+            <a href="{{ url_for('team.team_room', team_id=p.team_id) }}"
+               style="color: var(--neon-glow); text-decoration: none; font-size: 0.85rem;">
+              {{ p.team.name }}
+            </a>
+          </div>
         </td>
         <td>
           <span style="font-size: 0.7rem; background: rgba(37,99,235,0.1); color: var(--neon-glow);

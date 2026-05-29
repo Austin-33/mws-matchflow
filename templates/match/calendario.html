@@ -1,0 +1,505 @@
+{% extends 'base.html' %}
+{% block title %}Calendário de Jogos — AUSTIN LEAGUE CORE{% endblock %}
+
+{% block content %}
+<style>
+/* ── Calendário ─────────────────────────────────────────────── */
+.cal-wrap {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .cal-wrap { grid-template-columns: 1fr; }
+}
+
+/* Cabeçalho do mês */
+.cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cal-month-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.cal-nav {
+  display: flex;
+  gap: 6px;
+}
+.cal-nav a {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: .2s;
+}
+.cal-nav a:hover { border-color: var(--neon); color: var(--neon-glow); }
+
+/* Grelha */
+.cal-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+.cal-grid th {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 4px;
+  text-align: center;
+}
+.cal-day {
+  padding: 4px;
+  vertical-align: top;
+  width: 14.28%;
+  height: 72px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: .15s;
+  position: relative;
+  background: var(--bg-secondary);
+}
+.cal-day:hover { border-color: var(--neon); background: var(--bg-card); }
+.cal-day.other-month { opacity: .35; cursor: default; }
+.cal-day.today { border-color: var(--neon); background: rgba(37,99,235,.06); }
+.cal-day.selected { border-color: var(--neon); background: rgba(37,99,235,.14); box-shadow: 0 0 12px rgba(37,99,235,.25); }
+.cal-day.has-matches { cursor: pointer; }
+
+.cal-day-num {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.cal-day.today .cal-day-num { color: var(--neon-glow); }
+.cal-day.selected .cal-day-num { color: var(--neon-glow); }
+
+/* Dots de jogos */
+.cal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 2px;
+}
+.cal-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cal-dot.scheduled { background: var(--text-muted); }
+.cal-dot.live      { background: var(--danger); animation: pulse-dot 1s infinite; }
+.cal-dot.finished  { background: var(--success); }
+
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
+/* Contador de jogos */
+.cal-count {
+  position: absolute;
+  bottom: 4px; right: 5px;
+  font-size: .55rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.cal-day.has-matches .cal-count { color: var(--neon-glow); }
+
+/* ── Painel lateral de jogos ─────────────────────────────────── */
+.day-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: sticky;
+  top: 20px;
+}
+.day-panel-header {
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.day-panel-title {
+  font-size: .88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.day-panel-body {
+  padding: 12px;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+/* Match card no painel */
+.panel-match {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  text-decoration: none;
+  transition: .15s;
+  cursor: pointer;
+}
+.panel-match:hover { border-color: var(--neon); background: var(--bg-card); }
+.panel-match.live  { border-color: var(--danger); }
+.panel-match.finished { border-color: var(--success); }
+
+.panel-match-teams {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.panel-team {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.panel-team.right { flex-direction: row-reverse; text-align: right; }
+.panel-team-logo {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.panel-team-init {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .5rem; font-weight: 900; color: white;
+  flex-shrink: 0;
+}
+.panel-team-name {
+  font-size: .78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.panel-score {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--neon-glow);
+  min-width: 48px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.panel-match-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: .68rem;
+  color: var(--text-muted);
+}
+.panel-match-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* Filtro de torneio */
+.cal-filter {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+</style>
+
+<div class="page-header">
+  <div>
+    <div class="page-title">📅 Calendário <span>de Jogos</span></div>
+    <div class="page-subtitle">Clica numa data para ver os jogos agendados.</div>
+  </div>
+  <a href="{{ url_for('match.list_matches') }}" class="btn btn-secondary btn-sm">📋 Vista de Lista</a>
+</div>
+
+<!-- Filtro de torneio -->
+<div class="cal-filter">
+  <span style="font-size:.78rem;color:var(--text-muted);font-weight:600;">Filtrar por torneio:</span>
+  <a href="{{ url_for('match.calendario', year=year, month=month, date=selected_date) }}"
+     class="btn btn-sm {{ 'btn-primary' if not tournament_id else 'btn-secondary' }}"
+     style="font-size:.75rem;padding:4px 12px;">
+    Todos
+  </a>
+  {% for t in tournaments %}
+  <a href="{{ url_for('match.calendario', year=year, month=month, tournament_id=t.id, date=selected_date) }}"
+     class="btn btn-sm {{ 'btn-primary' if tournament_id == t.id else 'btn-secondary' }}"
+     style="font-size:.75rem;padding:4px 12px;">
+    {{ t.name }}
+  </a>
+  {% endfor %}
+</div>
+
+<div class="cal-wrap">
+
+  <!-- ── Calendário ─────────────────────────────────────────── -->
+  <div>
+    <div class="cal-header">
+      <div class="cal-month-title">{{ month_name }} {{ year }}</div>
+      <div class="cal-nav">
+        <a href="{{ url_for('match.calendario', year=prev_year, month=prev_month, tournament_id=tournament_id or '') }}"
+           title="Mês anterior">‹</a>
+        <a href="{{ url_for('match.calendario', year=today.year, month=today.month, tournament_id=tournament_id or '') }}"
+           title="Hoje" style="font-size:.6rem;font-weight:700;width:auto;padding:0 8px;">Hoje</a>
+        <a href="{{ url_for('match.calendario', year=next_year, month=next_month, tournament_id=tournament_id or '') }}"
+           title="Próximo mês">›</a>
+      </div>
+    </div>
+
+    <table class="cal-grid">
+      <thead>
+        <tr>
+          {% for day_name in ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'] %}
+          <th>{{ day_name }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for week in weeks %}
+        <tr>
+          {% for d in week %}
+          {% set d_str = d.strftime('%Y-%m-%d') %}
+          {% set day_matches_list = matches_by_date.get(d_str, []) %}
+          {% set is_other = d.month != month %}
+          {% set is_today = d == today %}
+          {% set is_selected = d_str == selected_date %}
+          {% set has_m = day_matches_list|length > 0 %}
+          <td class="cal-day
+                      {{ 'other-month' if is_other }}
+                      {{ 'today' if is_today }}
+                      {{ 'selected' if is_selected }}
+                      {{ 'has-matches' if has_m }}"
+              onclick="selectDay('{{ d_str }}', this)"
+              data-date="{{ d_str }}">
+            <div class="cal-day-num">{{ d.day }}</div>
+            {% if has_m and not is_other %}
+            <div class="cal-dots">
+              {% for m in day_matches_list[:6] %}
+              <div class="cal-dot {{ m.status }}"></div>
+              {% endfor %}
+            </div>
+            <div class="cal-count">{{ day_matches_list|length }}j</div>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Legenda -->
+    <div style="display:flex;gap:16px;margin-top:12px;font-size:.7rem;color:var(--text-muted);">
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--text-muted);margin-right:4px;"></span>Agendado</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-right:4px;"></span>Ao Vivo</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:4px;"></span>Terminado</span>
+    </div>
+  </div>
+
+  <!-- ── Painel de jogos do dia ─────────────────────────────── -->
+  <div class="day-panel">
+    <div class="day-panel-header">
+      <div class="day-panel-title" id="panel-title">
+        {% if selected_date %}
+          📅 {{ selected_date }}
+        {% else %}
+          📅 Seleciona uma data
+        {% endif %}
+      </div>
+      <span id="panel-count" style="font-size:.7rem;color:var(--text-muted);">
+        {% if day_matches %}{{ day_matches|length }} jogo(s){% endif %}
+      </span>
+    </div>
+    <div class="day-panel-body" id="panel-body">
+      {% if day_matches %}
+        {% for m in day_matches %}
+        {% set status_class = 'live' if m.status == 'live' else 'finished' if m.status == 'finished' else '' %}
+        <div class="panel-match {{ status_class }}" onclick="window.location='{{ url_for('match.match_detail', match_id=m.id) }}'">
+          <!-- Torneio + fase -->
+          <div class="panel-match-meta">
+            <span>🏆 {{ m.tournament.name }}</span>
+            <span>{{ m.phase_label }}</span>
+          </div>
+          <!-- Equipas + resultado -->
+          <div class="panel-match-teams">
+            <div class="panel-team">
+              {% if m.team1.logo_url %}
+              <img src="{{ url_for('static', filename=m.team1.logo_url) }}" class="panel-team-logo" />
+              {% else %}
+              <div class="panel-team-init" style="background:{{ m.team1.primary_color or '#2563eb' }};">{{ m.team1.initials }}</div>
+              {% endif %}
+              <span class="panel-team-name">{{ m.team1.name }}</span>
+            </div>
+            <div class="panel-score">
+              {% if m.status == 'live' %}
+              <span style="color:var(--danger);">{{ m.score_display }}</span>
+              {% else %}
+              {{ m.score_display }}
+              {% endif %}
+            </div>
+            <div class="panel-team right">
+              <span class="panel-team-name">{{ m.team2.name }}</span>
+              {% if m.team2.logo_url %}
+              <img src="{{ url_for('static', filename=m.team2.logo_url) }}" class="panel-team-logo" />
+              {% else %}
+              <div class="panel-team-init" style="background:{{ m.team2.primary_color or '#06b6d4' }};">{{ m.team2.initials }}</div>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Hora + estado + ações -->
+          <div class="panel-match-meta">
+            <span>
+              {% if m.status == 'live' %}
+              <span style="color:var(--danger);font-weight:700;">🔴 AO VIVO</span>
+              {% elif m.status == 'finished' %}
+              <span style="color:var(--success);">✅ Terminado</span>
+              {% else %}
+              ⏰ {{ m.time or '—' }}
+              {% endif %}
+            </span>
+            <span>{{ m.venue or '' }}</span>
+          </div>
+          <!-- Botões de ação -->
+          <div class="panel-match-actions" onclick="event.stopPropagation()">
+            <a href="{{ url_for('match.match_detail', match_id=m.id) }}"
+               class="btn btn-secondary btn-sm" style="font-size:.68rem;padding:3px 10px;">
+              👁 Detalhe
+            </a>
+            {% if m.status in ('scheduled', 'live') %}
+            <a href="{{ url_for('match.match_play', match_id=m.id) }}"
+               class="btn btn-primary btn-sm" style="font-size:.68rem;padding:3px 10px;">
+              ▶ Match Play
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% elif selected_date %}
+        <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+          <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+          <div style="font-size:.85rem;">Sem jogos neste dia.</div>
+        </div>
+      {% else %}
+        <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+          <div style="font-size:2rem;margin-bottom:8px;">👆</div>
+          <div style="font-size:.85rem;">Clica numa data para ver os jogos.</div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TOURNAMENT_ID = {{ tournament_id or 'null' }};
+
+function selectDay(dateStr, cell) {
+  // Remover seleção anterior
+  document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
+  cell.classList.add('selected');
+
+  // Atualizar URL sem recarregar
+  const url = new URL(window.location);
+  url.searchParams.set('date', dateStr);
+  window.history.replaceState({}, '', url);
+
+  // Mostrar loading
+  const body  = document.getElementById('panel-body');
+  const title = document.getElementById('panel-title');
+  const count = document.getElementById('panel-count');
+  title.textContent = '📅 ' + dateStr;
+  count.textContent = '';
+  body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted);">⏳ A carregar...</div>';
+
+  // Buscar jogos via AJAX
+  let apiUrl = `/calendario/dia?date=${dateStr}`;
+  if (TOURNAMENT_ID) apiUrl += `&tournament_id=${TOURNAMENT_ID}`;
+
+  fetch(apiUrl)
+    .then(r => r.json())
+    .then(matches => {
+      count.textContent = matches.length ? `${matches.length} jogo(s)` : '';
+
+      if (!matches.length) {
+        body.innerHTML = `
+          <div style="text-align:center;padding:40px 20px;color:var(--text-muted);">
+            <div style="font-size:2rem;margin-bottom:8px;">📭</div>
+            <div style="font-size:.85rem;">Sem jogos neste dia.</div>
+          </div>`;
+        return;
+      }
+
+      body.innerHTML = matches.map(m => {
+        const statusClass = m.status === 'live' ? 'live' : m.status === 'finished' ? 'finished' : '';
+        const scoreHtml = m.status === 'live'
+          ? `<span style="color:var(--danger);">${m.score}</span>`
+          : m.score;
+
+        const logo1 = m.team1_logo
+          ? `<img src="/static/${m.team1_logo}" class="panel-team-logo" />`
+          : `<div class="panel-team-init" style="background:#2563eb;">${m.team1.substring(0,2).toUpperCase()}</div>`;
+        const logo2 = m.team2_logo
+          ? `<img src="/static/${m.team2_logo}" class="panel-team-logo" />`
+          : `<div class="panel-team-init" style="background:#06b6d4;">${m.team2.substring(0,2).toUpperCase()}</div>`;
+
+        const statusLabel = m.status === 'live'
+          ? '<span style="color:var(--danger);font-weight:700;">🔴 AO VIVO</span>'
+          : m.status === 'finished'
+          ? '<span style="color:var(--success);">✅ Terminado</span>'
+          : `⏰ ${m.time || '—'}`;
+
+        const playBtn = (m.status === 'scheduled' || m.status === 'live')
+          ? `<a href="${m.play_url}" class="btn btn-primary btn-sm" style="font-size:.68rem;padding:3px 10px;" onclick="event.stopPropagation()">▶ Match Play</a>`
+          : '';
+
+        return `
+          <div class="panel-match ${statusClass}" onclick="window.location='${m.url}'">
+            <div class="panel-match-meta">
+              <span>🏆 ${m.tournament}</span>
+              <span>${m.phase}</span>
+            </div>
+            <div class="panel-match-teams">
+              <div class="panel-team">${logo1}<span class="panel-team-name">${m.team1}</span></div>
+              <div class="panel-score">${scoreHtml}</div>
+              <div class="panel-team right"><span class="panel-team-name">${m.team2}</span>${logo2}</div>
+            </div>
+            <div class="panel-match-meta">
+              <span>${statusLabel}</span>
+            </div>
+            <div class="panel-match-actions" onclick="event.stopPropagation()">
+              <a href="${m.url}" class="btn btn-secondary btn-sm" style="font-size:.68rem;padding:3px 10px;">👁 Detalhe</a>
+              ${playBtn}
+            </div>
+          </div>`;
+      }).join('');
+    })
+    .catch(() => {
+      body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);">Erro ao carregar jogos.</div>';
+    });
+}
+</script>
+{% endblock %}

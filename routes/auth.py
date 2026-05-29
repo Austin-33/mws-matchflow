@@ -174,6 +174,21 @@ def profile():
             else:
                 current_user.full_name = full_name
                 current_user.email = email
+
+                # Avatar upload
+                if 'avatar' in request.files:
+                    f_avatar = request.files['avatar']
+                    if f_avatar and f_avatar.filename:
+                        from austinapp import allowed_file
+                        import uuid, os
+                        from flask import current_app
+                        if allowed_file(f_avatar.filename):
+                            ext = f_avatar.filename.rsplit('.', 1)[1].lower()
+                            fname = f'avatar_{current_user.id}_{uuid.uuid4().hex[:8]}.{ext}'
+                            save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'players', fname)
+                            f_avatar.save(save_path)
+                            current_user.avatar_url = f'uploads/players/{fname}'
+
                 db.session.commit()
                 flash('✅ Perfil atualizado!', 'success')
 

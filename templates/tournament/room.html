@@ -29,6 +29,7 @@
     <span class="badge badge-finished">⬛ Terminado</span>
     {% endif %}
     <a href="{{ url_for('tournament.list_tournaments') }}" class="btn btn-secondary btn-sm">← Voltar</a>
+    <a href="{{ url_for('tournament.edit_tournament', tournament_id=tournament.id) }}" class="btn btn-primary btn-sm">✏️ Editar</a>
     <a href="{{ url_for('finance.finance', tid=tournament.id) }}" class="btn btn-secondary btn-sm">💰 Finanças</a>
     <form method="POST" action="{{ url_for('tournament.delete_tournament', tournament_id=tournament.id) }}"
           onsubmit="return confirm('Eliminar torneio?')">

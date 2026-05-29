@@ -9,6 +9,7 @@ from models.tournament import Tournament, Group, TournamentTeam
 from models.team import Team
 from models.match import Match
 from utils.scheduler import generate_round_robin, assign_dates, generate_groups, generate_knockout_bracket, auto_knockout_structure
+from utils.permissions import require_manager, require_tournament_owner, require_match_owner, can_edit_tournament
 
 tournament_bp = Blueprint('tournament', __name__)
 
@@ -26,6 +27,7 @@ def list_tournaments():
 
 @tournament_bp.route('/tournaments/create', methods=['GET', 'POST'])
 @login_required
+@require_manager
 def create_tournament():
     teams = Team.query.order_by(Team.name).all()
 
@@ -80,6 +82,7 @@ def create_tournament():
             has_round_of_16=has_round_of_16, has_quarter=has_quarter,
             has_semi=has_semi, has_final=has_final, knockout_legs=knockout_legs,
             start_date=start_date,
+            created_by_id=current_user.id,
         )
         db.session.add(tournament)
         db.session.commit()
@@ -88,7 +91,7 @@ def create_tournament():
         if 'logo' in request.files:
             f_logo = request.files['logo']
             if f_logo and f_logo.filename:
-                from app import allowed_file
+                from austinapp import allowed_file
                 import uuid
                 if allowed_file(f_logo.filename):
                     ext = f_logo.filename.rsplit('.', 1)[1].lower()
@@ -124,6 +127,7 @@ def create_tournament():
 
 @tournament_bp.route('/tournaments/<int:tournament_id>/register', methods=['POST'])
 @login_required
+@require_tournament_owner
 def register_team(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     team_id = request.form.get('team_id', type=int)
@@ -152,6 +156,7 @@ def register_team(tournament_id):
 
 @tournament_bp.route('/tournaments/<int:tournament_id>/generate', methods=['POST'])
 @login_required
+@require_tournament_owner
 def generate_calendar(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     team_ids = [tt.team_id for tt in TournamentTeam.query.filter_by(tournament_id=tournament_id).all()]
@@ -185,6 +190,7 @@ def generate_calendar(tournament_id):
 
 @tournament_bp.route('/tournaments/<int:tournament_id>/assign-groups', methods=['POST'])
 @login_required
+@require_tournament_owner
 def assign_groups(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     mode = request.form.get('mode', 'random')  # random | manual
@@ -391,6 +397,7 @@ def draw_groups(tournament_id):
 
 @tournament_bp.route('/tournaments/<int:tournament_id>/draw/save', methods=['POST'])
 @login_required
+@require_tournament_owner
 def save_draw(tournament_id):
     """AJAX — save group assignments from drag & drop."""
     tournament = Tournament.query.get_or_404(tournament_id)
@@ -491,10 +498,195 @@ def bracket(tournament_id):
                            phase_order=[p for p in phase_order if p in bracket_data])
 
 
+# ─── Edit tournament info ─────────────────────────────────────
+
+@tournament_bp.route('/tournaments/<int:tournament_id>/edit', methods=['GET', 'POST'])
+@login_required
+@require_tournament_owner
+def edit_tournament(tournament_id):
+    tournament = Tournament.query.get_or_404(tournament_id)
+    all_matches = Match.query.filter_by(tournament_id=tournament_id)\
+        .order_by(Match.phase, Match.round_number, Match.date).all()
+
+    if request.method == 'POST':
+        f = request.form
+        tournament.name             = f.get('name', tournament.name).strip()
+        tournament.sport            = f.get('sport', tournament.sport)
+        tournament.status           = f.get('status', tournament.status)
+        tournament.start_date       = f.get('start_date', tournament.start_date or '').strip()
+        tournament.description      = f.get('description', '').strip()
+        tournament.type             = f.get('type', tournament.type)
+        tournament.format_type      = f.get('format_type', tournament.format_type)
+        tournament.teams_count      = int(f.get('teams_count') or tournament.teams_count or 0)
+        tournament.groups_count     = int(f.get('groups_count') or 0)
+        tournament.teams_per_group  = int(f.get('teams_per_group') or 0)
+        tournament.qualify_per_group = int(f.get('qualify_per_group') or 2)
+        tournament.group_legs       = int(f.get('group_legs') or 1)
+        tournament.knockout_legs    = int(f.get('knockout_legs') or 1)
+        tournament.has_groups       = 'has_groups'      in f
+        tournament.has_knockout     = 'has_knockout'    in f
+        tournament.has_round_of_16  = 'has_round_of_16' in f
+        tournament.has_quarter      = 'has_quarter'     in f
+        tournament.has_semi         = 'has_semi'        in f
+        tournament.has_final        = 'has_final'       in f
+        tournament.currency         = f.get('currency', tournament.currency or 'KWZ').strip()
+        tournament.registration_fee  = float(f.get('registration_fee') or 0)
+        tournament.participation_fee = float(f.get('participation_fee') or 0)
+        tournament.prize_pool_total  = float(f.get('prize_pool_total') or 0)
+
+        # Logo upload
+        if 'logo' in request.files:
+            f_logo = request.files['logo']
+            if f_logo and f_logo.filename:
+                from austinapp import allowed_file
+                import uuid
+                if allowed_file(f_logo.filename):
+                    ext = f_logo.filename.rsplit('.', 1)[1].lower()
+                    fname = f'tournament_{tournament.id}_{uuid.uuid4().hex[:8]}.{ext}'
+                    save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], 'logos', fname)
+                    f_logo.save(save_path)
+                    tournament.logo_url = f'uploads/logos/{fname}'
+
+        db.session.commit()
+        flash('✅ Torneio atualizado com sucesso!', 'success')
+        return redirect(url_for('tournament.edit_tournament', tournament_id=tournament_id))
+
+    return render_template('tournament/edit.html',
+                           tournament=tournament,
+                           all_matches=all_matches)
+
+
+# ─── Edit matches (bulk save) ─────────────────────────────────
+
+@tournament_bp.route('/tournaments/<int:tournament_id>/edit-matches', methods=['POST'])
+@login_required
+@require_tournament_owner
+def edit_matches(tournament_id):
+    from models.tournament import TournamentTeam
+
+    tournament = Tournament.query.get_or_404(tournament_id)
+    all_matches = Match.query.filter_by(tournament_id=tournament_id).all()
+
+    for match in all_matches:
+        mid = match.id
+        new_date   = request.form.get(f'date_{mid}', '').strip()
+        new_status = request.form.get(f'status_{mid}', match.status)
+        score1_raw = request.form.get(f'score1_{mid}', '')
+        score2_raw = request.form.get(f'score2_{mid}', '')
+
+        if new_date:
+            match.date = new_date
+        match.status = new_status
+
+        new_score1 = int(score1_raw) if score1_raw.strip().isdigit() else None
+        new_score2 = int(score2_raw) if score2_raw.strip().isdigit() else None
+
+        # If result changed and match is finished, recalculate standings
+        if (new_status == 'finished' and
+                new_score1 is not None and new_score2 is not None and
+                (match.score1 != new_score1 or match.score2 != new_score2)):
+
+            # Reverse old standings if match was already finished
+            if match.status == 'finished' and match.score1 is not None:
+                _reverse_standings(match)
+
+            match.score1 = new_score1
+            match.score2 = new_score2
+            _update_standings_direct(match)
+        else:
+            if new_score1 is not None:
+                match.score1 = new_score1
+            if new_score2 is not None:
+                match.score2 = new_score2
+
+    db.session.commit()
+    flash(f'✅ {len(all_matches)} jogos atualizados!', 'success')
+    return redirect(url_for('tournament.edit_tournament', tournament_id=tournament_id) + '#tab-matches')
+
+
+# ─── Bulk reschedule ──────────────────────────────────────────
+
+@tournament_bp.route('/tournaments/<int:tournament_id>/bulk-reschedule', methods=['POST'])
+@login_required
+@require_manager
+def bulk_reschedule(tournament_id):
+    days_shift    = int(request.form.get('days_shift', 0) or 0)
+    status_filter = request.form.get('status_filter', '')
+
+    if days_shift == 0:
+        flash('Indica um número de dias diferente de 0.', 'error')
+        return redirect(url_for('tournament.edit_tournament', tournament_id=tournament_id) + '#tab-matches')
+
+    query = Match.query.filter_by(tournament_id=tournament_id)
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+
+    matches = query.all()
+    updated = 0
+    for match in matches:
+        if match.date:
+            try:
+                old = datetime.strptime(match.date, '%Y-%m-%d')
+                match.date = (old + timedelta(days=days_shift)).strftime('%Y-%m-%d')
+                updated += 1
+            except ValueError:
+                pass
+
+    db.session.commit()
+    direction = 'avançados' if days_shift > 0 else 'recuados'
+    flash(f'✅ {updated} jogos {direction} em {abs(days_shift)} dias.', 'success')
+    return redirect(url_for('tournament.edit_tournament', tournament_id=tournament_id) + '#tab-matches')
+
+
+# ─── Standings helpers ────────────────────────────────────────
+
+def _reverse_standings(match):
+    """Undo the effect of a finished match on standings."""
+    from models.tournament import TournamentTeam
+    t1 = TournamentTeam.query.filter_by(tournament_id=match.tournament_id, team_id=match.team1_id).first()
+    t2 = TournamentTeam.query.filter_by(tournament_id=match.tournament_id, team_id=match.team2_id).first()
+    if not t1 or not t2:
+        return
+    t1.played = max(0, t1.played - 1)
+    t2.played = max(0, t2.played - 1)
+    t1.goals_for    = max(0, t1.goals_for    - match.score1)
+    t1.goals_against = max(0, t1.goals_against - match.score2)
+    t2.goals_for    = max(0, t2.goals_for    - match.score2)
+    t2.goals_against = max(0, t2.goals_against - match.score1)
+    if match.score1 > match.score2:
+        t1.wins   = max(0, t1.wins   - 1); t1.points = max(0, t1.points - 3)
+        t2.losses = max(0, t2.losses - 1)
+    elif match.score2 > match.score1:
+        t2.wins   = max(0, t2.wins   - 1); t2.points = max(0, t2.points - 3)
+        t1.losses = max(0, t1.losses - 1)
+    else:
+        t1.draws = max(0, t1.draws - 1); t1.points = max(0, t1.points - 1)
+        t2.draws = max(0, t2.draws - 1); t2.points = max(0, t2.points - 1)
+
+
+def _update_standings_direct(match):
+    """Apply a finished match result to standings."""
+    from models.tournament import TournamentTeam
+    t1 = TournamentTeam.query.filter_by(tournament_id=match.tournament_id, team_id=match.team1_id).first()
+    t2 = TournamentTeam.query.filter_by(tournament_id=match.tournament_id, team_id=match.team2_id).first()
+    if not t1 or not t2:
+        return
+    t1.played += 1; t2.played += 1
+    t1.goals_for    += match.score1; t1.goals_against += match.score2
+    t2.goals_for    += match.score2; t2.goals_against += match.score1
+    if match.score1 > match.score2:
+        t1.wins += 1; t1.points += 3; t2.losses += 1
+    elif match.score2 > match.score1:
+        t2.wins += 1; t2.points += 3; t1.losses += 1
+    else:
+        t1.draws += 1; t2.draws += 1; t1.points += 1; t2.points += 1
+
+
 # ─── Delete ───────────────────────────────────────────────────
 
 @tournament_bp.route('/tournaments/<int:tournament_id>/delete', methods=['POST'])
 @login_required
+@require_manager
 def delete_tournament(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     db.session.delete(tournament)

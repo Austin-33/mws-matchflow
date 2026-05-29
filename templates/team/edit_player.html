@@ -11,11 +11,33 @@
 </div>
 
 <div style="max-width: 800px;">
-  <form method="POST" action="{{ url_for('team.edit_player', player_id=player.id) }}">
+  <form method="POST" action="{{ url_for('team.edit_player', player_id=player.id) }}" enctype="multipart/form-data">
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
 
       <div class="card">
         <div class="card-title">👤 Dados Pessoais</div>
+        <!-- Foto do jogador -->
+        <div class="form-group">
+          <label class="form-label">Foto do Jogador</label>
+          <div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+            {% if player.photo_url %}
+            <img src="{{ url_for('static', filename=player.photo_url) }}"
+                 style="width:56px;height:56px;border-radius:50%;object-fit:cover;
+                        border:2px solid var(--border);" id="photo-current" />
+            {% else %}
+            <div style="width:56px;height:56px;border-radius:50%;flex-shrink:0;
+                 background:linear-gradient(135deg,var(--neon),var(--accent));
+                 display:flex;align-items:center;justify-content:center;
+                 font-size:1.2rem;font-weight:900;color:white;" id="photo-current">
+              {{ player.name[0].upper() }}
+            </div>
+            {% endif %}
+            <input type="file" name="photo" class="form-control" accept="image/*"
+                   style="flex:1;" onchange="previewPhoto(this)" />
+          </div>
+          <img id="photo-preview" style="display:none;width:56px;height:56px;border-radius:50%;
+               object-fit:cover;border:2px solid var(--neon);margin-top:4px;" />
+        </div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Nome Completo *</label>
@@ -132,4 +154,15 @@
     </div>
   </form>
 </div>
+
+<script>
+function previewPhoto(input) {
+  const prev = document.getElementById('photo-preview');
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => { prev.src = e.target.result; prev.style.display = 'block'; };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+</script>
 {% endblock %}

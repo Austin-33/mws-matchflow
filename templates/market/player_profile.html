@@ -21,6 +21,10 @@
       <img src="{{ url_for('static', filename=player.photo_url) }}"
            style="width:80px;height:80px;border-radius:50%;object-fit:cover;
                   border:3px solid var(--neon);margin-bottom:12px;" />
+      {% elif agent.avatar_url %}
+      <img src="{{ url_for('static', filename=agent.avatar_url) }}"
+           style="width:80px;height:80px;border-radius:50%;object-fit:cover;
+                  border:3px solid var(--neon);margin-bottom:12px;" />
       {% else %}
       <div style="width:80px;height:80px;border-radius:50%;margin:0 auto 12px;
            background:linear-gradient(135deg,var(--neon),var(--accent));

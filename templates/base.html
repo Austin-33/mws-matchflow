@@ -7,6 +7,48 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+  /* ── Sidebar submenu ─────────────────────────────────────── */
+  .nav-submenu-wrap { position: relative; }
+  .nav-submenu-toggle {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; border-radius: 8px;
+    font-size: .85rem; font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer; transition: .15s;
+    user-select: none;
+  }
+  .nav-submenu-toggle:hover,
+  .nav-submenu-toggle.active {
+    background: rgba(37,99,235,.12);
+    color: var(--neon-glow);
+  }
+  .nav-arrow {
+    margin-left: auto;
+    font-size: .75rem;
+    transition: transform .2s;
+    color: var(--text-muted);
+  }
+  .nav-arrow.open { transform: rotate(90deg); }
+  .nav-submenu {
+    padding-left: 12px;
+    border-left: 2px solid var(--border);
+    margin: 2px 0 4px 20px;
+  }
+  .nav-submenu a {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; border-radius: 6px;
+    font-size: .8rem; font-weight: 500;
+    color: var(--text-muted);
+    text-decoration: none; transition: .15s;
+  }
+  .nav-submenu a:hover,
+  .nav-submenu a.active {
+    background: rgba(37,99,235,.1);
+    color: var(--neon-glow);
+  }
+  .nav-submenu .nav-icon { font-size: .85rem; }
+  </style>
 </head>
 <body>
 
@@ -33,9 +75,34 @@
       <a href="{{ url_for('tournament.list_tournaments') }}" class="{{ 'active' if 'tournament' in request.endpoint }}">
         <span class="nav-icon">🏆</span> Campeonatos
       </a>
-      <a href="{{ url_for('match.list_matches') }}" class="{{ 'active' if 'match' in request.endpoint }}">
-        <span class="nav-icon">📅</span> Jogos do Dia
-      </a>
+
+      <!-- ── Match (submenu) ─────────────────────────────── -->
+      {% set match_active = 'match' in request.endpoint %}
+      <div class="nav-submenu-wrap">
+        <div class="nav-submenu-toggle {{ 'active' if match_active }}"
+             onclick="toggleSubmenu('match-sub', this)"
+             id="match-toggle">
+          <span class="nav-icon">⚽</span>
+          <span>Match</span>
+          <span class="nav-arrow" id="match-arrow">›</span>
+        </div>
+        <div class="nav-submenu" id="match-sub" style="{{ '' if match_active else 'display:none;' }}">
+          <a href="{{ url_for('match.calendario') }}"
+             class="{{ 'active' if request.endpoint == 'match.calendario' or request.endpoint == 'match.calendario_dia' }}">
+            <span class="nav-icon">📅</span> Calendário
+          </a>
+          <a href="{{ url_for('match.list_matches') }}"
+             class="{{ 'active' if request.endpoint == 'match.list_matches' }}">
+            <span class="nav-icon">📋</span> Jogos do Dia
+          </a>
+          {% if current_user.role in ('admin', 'manager') %}
+          <a href="{{ url_for('match.calendario') }}?date={{ now_date }}"
+             class="">
+            <span class="nav-icon">▶</span> Jogos de Hoje
+          </a>
+          {% endif %}
+        </div>
+      </div>
 
       <div class="nav-section-label">Equipas</div>
       <a href="{{ url_for('team.list_teams') }}" class="{{ 'active' if 'team' in request.endpoint }}">
@@ -60,7 +127,18 @@
       </a>
       {% endif %}
       <a href="{{ url_for('auth.profile') }}" class="{{ 'active' if request.endpoint == 'auth.profile' }}">
-        <span class="nav-icon">👤</span>
+        {% if current_user.avatar_url %}
+        <img src="{{ url_for('static', filename=current_user.avatar_url) }}"
+             style="width:24px;height:24px;border-radius:50%;object-fit:cover;
+                    border:1px solid var(--border);flex-shrink:0;" />
+        {% else %}
+        <span class="nav-icon" style="width:24px;height:24px;border-radius:50%;
+             background:linear-gradient(135deg,var(--neon),var(--accent));
+             display:inline-flex;align-items:center;justify-content:center;
+             font-size:0.7rem;font-weight:900;color:white;flex-shrink:0;">
+          {{ current_user.display_name[0].upper() }}
+        </span>
+        {% endif %}
         <span>{{ current_user.display_name }}</span>
         <span style="font-size: 0.6rem; background: rgba(37,99,235,0.15); color: var(--neon-glow);
                      padding: 1px 5px; border-radius: 3px; margin-left: 4px;">{{ current_user.role }}</span>
@@ -91,6 +169,26 @@
 {% endif %}
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+<script>
+// ── Sidebar submenu toggle ────────────────────────────────────
+function toggleSubmenu(id, toggle) {
+  const sub   = document.getElementById(id);
+  const arrow = toggle.querySelector('.nav-arrow');
+  const open  = sub.style.display !== 'none';
+  sub.style.display   = open ? 'none' : 'block';
+  if (arrow) arrow.classList.toggle('open', !open);
+}
+
+// Auto-abrir submenu se estiver numa página match
+document.addEventListener('DOMContentLoaded', function() {
+  const sub   = document.getElementById('match-sub');
+  const arrow = document.getElementById('match-arrow');
+  if (sub && sub.style.display !== 'none' && arrow) {
+    arrow.classList.add('open');
+  }
+});
+</script>
 
 {% if current_user.is_authenticated %}
 <!-- ─── Ticker de Resultados (rodapé dinâmico) ─────────────── -->

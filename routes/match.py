@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 from flask import Blueprint, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import login_required
 
 from extensions import db
 from models.match import Match, PlayerMatchStat, MatchEvent, MatchLineup
-from models.tournament import TournamentTeam
+from models.tournament import TournamentTeam, Tournament
 from models.team import Player, Team
 
 match_bp = Blueprint('match', __name__)
@@ -304,3 +304,135 @@ def _update_standings(match):
         t2.wins += 1; t2.points += 3; t1.losses += 1
     else:
         t1.draws += 1; t2.draws += 1; t1.points += 1; t2.points += 1
+
+
+# ─── Calendário de Jogos ──────────────────────────────────────
+
+@match_bp.route('/calendario')
+@login_required
+def calendario():
+    """
+    Calendário mensal de jogos.
+    Parâmetros: year, month, tournament_id (opcional)
+    Ao clicar numa data → lista os jogos desse dia.
+    """
+    today = date.today()
+    year  = request.args.get('year',  type=int, default=today.year)
+    month = request.args.get('month', type=int, default=today.month)
+    selected_date = request.args.get('date', '')          # YYYY-MM-DD
+    tournament_id = request.args.get('tournament_id', type=int)
+
+    # Navegar entre meses
+    if month < 1:  month = 12; year -= 1
+    if month > 12: month = 1;  year += 1
+
+    # Primeiro e último dia do mês
+    first_day = date(year, month, 1)
+    if month == 12:
+        last_day = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        last_day = date(year, month + 1, 1) - timedelta(days=1)
+
+    # Todos os jogos do mês
+    first_str = first_day.strftime('%Y-%m-%d')
+    last_str  = last_day.strftime('%Y-%m-%d')
+
+    query = Match.query.filter(
+        Match.date >= first_str,
+        Match.date <= last_str
+    )
+    if tournament_id:
+        query = query.filter_by(tournament_id=tournament_id)
+
+    month_matches = query.order_by(Match.date, Match.time).all()
+
+    # Agrupar por data → {date_str: [matches]}
+    matches_by_date = {}
+    for m in month_matches:
+        if m.date:
+            matches_by_date.setdefault(m.date, []).append(m)
+
+    # Jogos do dia selecionado (ou hoje se nenhum selecionado)
+    day_matches = []
+    if selected_date:
+        day_matches = matches_by_date.get(selected_date, [])
+    elif today.strftime('%Y-%m-%d') in matches_by_date:
+        selected_date = today.strftime('%Y-%m-%d')
+        day_matches = matches_by_date[selected_date]
+
+    # Construir grelha do calendário (semanas)
+    # Começa na segunda-feira da semana do primeiro dia
+    start = first_day - timedelta(days=first_day.weekday())  # Monday
+    weeks = []
+    current = start
+    while current <= last_day or len(weeks) < 6:
+        week = []
+        for _ in range(7):
+            week.append(current)
+            current += timedelta(days=1)
+        weeks.append(week)
+        if current > last_day and len(weeks) >= 4:
+            break
+
+    # Todos os torneios para o filtro
+    tournaments = Tournament.query.order_by(Tournament.name).all()
+
+    # Meses para navegação
+    prev_month = month - 1 if month > 1 else 12
+    prev_year  = year if month > 1 else year - 1
+    next_month = month + 1 if month < 12 else 1
+    next_year  = year if month < 12 else year + 1
+
+    month_names = [
+        '', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ]
+
+    return render_template('match/calendario.html',
+                           year=year, month=month,
+                           month_name=month_names[month],
+                           weeks=weeks,
+                           first_day=first_day,
+                           last_day=last_day,
+                           today=today,
+                           matches_by_date=matches_by_date,
+                           selected_date=selected_date,
+                           day_matches=day_matches,
+                           tournaments=tournaments,
+                           tournament_id=tournament_id,
+                           prev_month=prev_month, prev_year=prev_year,
+                           next_month=next_month, next_year=next_year)
+
+
+# ─── API: jogos de um dia (AJAX) ──────────────────────────────
+
+@match_bp.route('/calendario/dia')
+@login_required
+def calendario_dia():
+    """Retorna os jogos de uma data específica em JSON para AJAX."""
+    day = request.args.get('date', '')
+    tournament_id = request.args.get('tournament_id', type=int)
+
+    if not day:
+        return jsonify([])
+
+    query = Match.query.filter_by(date=day)
+    if tournament_id:
+        query = query.filter_by(tournament_id=tournament_id)
+
+    matches = query.order_by(Match.time).all()
+
+    return jsonify([{
+        'id': m.id,
+        'team1': m.team1.name,
+        'team2': m.team2.name,
+        'team1_logo': m.team1.logo_url or '',
+        'team2_logo': m.team2.logo_url or '',
+        'score': m.score_display,
+        'status': m.status,
+        'time': m.time or '',
+        'tournament': m.tournament.name,
+        'phase': m.phase_label,
+        'url': url_for('match.match_detail', match_id=m.id),
+        'play_url': url_for('match.match_play', match_id=m.id),
+    } for m in matches])

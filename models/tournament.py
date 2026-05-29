@@ -9,10 +9,12 @@ class Tournament(db.Model):
     name = db.Column(db.String(100), nullable=False)
     sport = db.Column(db.String(50), default='futsal')
     type = db.Column(db.String(50), nullable=False)
-    # format_type: campeonato | liga | torneio | taca
     format_type = db.Column(db.String(20), default='liga')
-    # pending = open for registration | active = running | finished
     status = db.Column(db.String(20), default='pending')
+
+    # ─── Criador ──────────────────────────────────────────────
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
 
     teams_count = db.Column(db.Integer, default=0)       # max teams expected
     description = db.Column(db.Text)

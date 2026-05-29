@@ -19,12 +19,18 @@
       <div class="card-title">🪪 Identificação</div>
 
       <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
-        <div style="width: 56px; height: 56px; border-radius: 50%;
+        {% if current_user.avatar_url %}
+        <img src="{{ url_for('static', filename=current_user.avatar_url) }}"
+             style="width:64px;height:64px;border-radius:50%;object-fit:cover;
+                    border:3px solid var(--neon);flex-shrink:0;" />
+        {% else %}
+        <div style="width: 64px; height: 64px; border-radius: 50%;
              background: linear-gradient(135deg, var(--neon), var(--accent));
              display: flex; align-items: center; justify-content: center;
-             font-size: 1.4rem; font-weight: 900; color: white; flex-shrink: 0;">
+             font-size: 1.6rem; font-weight: 900; color: white; flex-shrink: 0;">
           {{ current_user.display_name[0].upper() }}
         </div>
+        {% endif %}
         <div>
           <div style="font-size: 1.1rem; font-weight: 800;">{{ current_user.display_name }}</div>
           <div style="font-size: 0.8rem; color: var(--text-muted);">@{{ current_user.username }}</div>
@@ -58,8 +64,31 @@
     <!-- Editar Perfil -->
     <div class="card">
       <div class="card-title">✏️ Editar Perfil</div>
-      <form method="POST" action="{{ url_for('auth.profile') }}">
+      <form method="POST" action="{{ url_for('auth.profile') }}" enctype="multipart/form-data">
         <input type="hidden" name="action" value="update_profile" />
+        <!-- Avatar upload -->
+        <div class="form-group">
+          <label class="form-label">Foto de Perfil</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+            {% if current_user.avatar_url %}
+            <img src="{{ url_for('static', filename=current_user.avatar_url) }}"
+                 id="avatar-current"
+                 style="width:48px;height:48px;border-radius:50%;object-fit:cover;
+                        border:2px solid var(--border);" />
+            {% else %}
+            <div id="avatar-current" style="width:48px;height:48px;border-radius:50%;
+                 background:linear-gradient(135deg,var(--neon),var(--accent));
+                 display:flex;align-items:center;justify-content:center;
+                 font-size:1.1rem;font-weight:900;color:white;">
+              {{ current_user.display_name[0].upper() }}
+            </div>
+            {% endif %}
+            <img id="avatar-preview" style="display:none;width:48px;height:48px;border-radius:50%;
+                 object-fit:cover;border:2px solid var(--neon);" />
+            <input type="file" name="avatar" class="form-control" accept="image/*"
+                   style="flex:1;" onchange="previewAvatar(this)" />
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Nome Completo</label>
           <input type="text" name="full_name" class="form-control"
@@ -204,5 +233,17 @@ function checkMatch() {
   hint.style.color = pw1 === pw2 ? 'var(--success)' : 'var(--danger)';
   hint.textContent = pw1 === pw2 ? '✅ Passwords coincidem' : '❌ Passwords não coincidem';
 }
-</script>
-{% endblock %}
+function previewAvatar(input) {
+  const prev = document.getElementById('avatar-preview');
+  const curr = document.getElementById('avatar-current');
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      prev.src = e.target.result;
+      prev.style.display = 'block';
+      if (curr) curr.style.display = 'none';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+</script>{% endblock %}

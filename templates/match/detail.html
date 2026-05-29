@@ -23,7 +23,17 @@
 <div class="card" style="margin-bottom: 24px; text-align: center; padding: 40px 20px;
      background: linear-gradient(135deg, var(--bg-card), var(--bg-secondary));">
   <div style="display: flex; align-items: center; justify-content: center; gap: 40px;">
-    <div style="flex: 1; text-align: right;">
+    <div style="flex: 1; text-align: right; display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+      {% if match.team1.logo_url %}
+      <img src="{{ url_for('static', filename=match.team1.logo_url) }}"
+           style="width:52px;height:52px;border-radius:50%;object-fit:contain;
+                  background:var(--bg-secondary);padding:3px;border:2px solid var(--border);" />
+      {% else %}
+      <div style="width:52px;height:52px;border-radius:50%;
+           background:{{ match.team1.primary_color or '#2563eb' }};
+           display:flex;align-items:center;justify-content:center;
+           font-weight:900;color:white;font-size:1rem;">{{ match.team1.initials }}</div>
+      {% endif %}
       <a href="{{ url_for('team.team_room', team_id=match.team1_id) }}"
          style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); text-decoration: none;">
         {{ match.team1.name }}
@@ -41,7 +51,17 @@
         </span>
       </div>
     </div>
-    <div style="flex: 1; text-align: left;">
+    <div style="flex: 1; text-align: left; display:flex; flex-direction:column; align-items:flex-start; gap:8px;">
+      {% if match.team2.logo_url %}
+      <img src="{{ url_for('static', filename=match.team2.logo_url) }}"
+           style="width:52px;height:52px;border-radius:50%;object-fit:contain;
+                  background:var(--bg-secondary);padding:3px;border:2px solid var(--border);" />
+      {% else %}
+      <div style="width:52px;height:52px;border-radius:50%;
+           background:{{ match.team2.primary_color or '#06b6d4' }};
+           display:flex;align-items:center;justify-content:center;
+           font-weight:900;color:white;font-size:1rem;">{{ match.team2.initials }}</div>
+      {% endif %}
       <a href="{{ url_for('team.team_room', team_id=match.team2_id) }}"
          style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary); text-decoration: none;">
         {{ match.team2.name }}

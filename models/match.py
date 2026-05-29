@@ -23,7 +23,11 @@ class Match(db.Model):
     # ─── Result ───────────────────────────────────────────────
     score1 = db.Column(db.Integer, nullable=True)
     score2 = db.Column(db.Integer, nullable=True)
-    status = db.Column(db.String(20), default='scheduled')  # scheduled | live | finished
+    status = db.Column(db.String(20), default='scheduled')  # scheduled | live | finished | cancelled
+
+    # ─── Criador / controlo ───────────────────────────────────
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
 
     # ─── Match duration (minutes played) ──────────────────────
     minute_current = db.Column(db.Integer, default=0)

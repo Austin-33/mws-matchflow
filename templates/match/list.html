@@ -44,6 +44,16 @@
     {% endif %}
     <a href="{{ url_for('match.match_detail', match_id=m.id) }}" class="match-card" style="margin-bottom: 8px;">
       <div class="match-team">
+        {% if m.team1.logo_url %}
+        <img src="{{ url_for('static', filename=m.team1.logo_url) }}"
+             style="width:28px;height:28px;border-radius:50%;object-fit:contain;
+                    background:var(--bg-secondary);padding:2px;border:1px solid var(--border);margin-right:8px;flex-shrink:0;" />
+        {% else %}
+        <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;margin-right:8px;
+             background:{{ m.team1.primary_color or '#2563eb' }};
+             display:flex;align-items:center;justify-content:center;
+             font-size:0.6rem;font-weight:900;color:{{ m.team1.secondary_color or '#fff' }};">{{ m.team1.initials }}</div>
+        {% endif %}
         <div class="team-name">{{ m.team1.name }}</div>
       </div>
       <div class="match-score">
@@ -58,6 +68,16 @@
       </div>
       <div class="match-team right">
         <div class="team-name">{{ m.team2.name }}</div>
+        {% if m.team2.logo_url %}
+        <img src="{{ url_for('static', filename=m.team2.logo_url) }}"
+             style="width:28px;height:28px;border-radius:50%;object-fit:contain;
+                    background:var(--bg-secondary);padding:2px;border:1px solid var(--border);margin-left:8px;flex-shrink:0;" />
+        {% else %}
+        <div style="width:28px;height:28px;border-radius:50%;flex-shrink:0;margin-left:8px;
+             background:{{ m.team2.primary_color or '#06b6d4' }};
+             display:flex;align-items:center;justify-content:center;
+             font-size:0.6rem;font-weight:900;color:{{ m.team2.secondary_color or '#fff' }};">{{ m.team2.initials }}</div>
+        {% endif %}
       </div>
     </a>
   {% endfor %}

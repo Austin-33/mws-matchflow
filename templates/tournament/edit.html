@@ -1,0 +1,440 @@
+{% extends 'base.html' %}
+{% block title %}Editar {{ tournament.name }} — AUSTIN LEAGUE CORE{% endblock %}
+{% block content %}
+<style>
+.etab-nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;border-bottom:2px solid var(--border);padding-bottom:12px;}
+.etab-btn{padding:8px 16px;border-radius:8px 8px 0 0;font-size:.82rem;font-weight:700;cursor:pointer;
+  background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-muted);transition:.2s;text-decoration:none;}
+.etab-btn.active{background:var(--neon);color:#fff;border-color:var(--neon);}
+.etab-pane{display:none;} .etab-pane.on{display:block;}
+.match-edit-row{display:grid;grid-template-columns:1fr 80px 80px 1fr 120px 100px 36px;gap:8px;align-items:center;
+  padding:10px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:6px;}
+@media(max-width:700px){.match-edit-row{grid-template-columns:1fr 1fr;gap:6px;}}
+.match-edit-row .team-label{font-size:.82rem;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.match-edit-row .team-label.right{text-align:right;}
+.score-inp{width:100%;text-align:center;font-size:1.1rem;font-weight:800;padding:6px 4px;
+  background:var(--bg-card);border:2px solid var(--border);border-radius:6px;color:var(--neon-glow);}
+.score-inp:focus{border-color:var(--neon);outline:none;}
+.date-inp,.time-inp{width:100%;font-size:.78rem;padding:6px 8px;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);}
+.status-sel{width:100%;font-size:.75rem;padding:5px 6px;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);}
+.round-header{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--text-muted);margin:18px 0 8px;padding:4px 10px;background:var(--bg-primary);
+  border-radius:4px;display:inline-block;}
+.save-row{position:sticky;bottom:0;background:var(--bg-card);border-top:1px solid var(--border);
+  padding:12px 0;margin-top:20px;display:flex;gap:10px;align-items:center;z-index:10;}
+.badge-scheduled{background:rgba(100,116,139,.15);color:#94a3b8;border:1px solid rgba(100,116,139,.3);}
+.badge-live{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);}
+.badge-finished{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);}
+</style>
+
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:14px;">
+    {% if tournament.logo_url %}
+    <img src="{{ url_for('static', filename=tournament.logo_url) }}"
+         style="width:48px;height:48px;border-radius:10px;object-fit:contain;background:var(--bg-secondary);padding:4px;border:2px solid var(--border);" />
+    {% else %}
+    <div style="width:48px;height:48px;border-radius:10px;background:var(--neon);
+         display:flex;align-items:center;justify-content:center;font-size:1.4rem;">🏆</div>
+    {% endif %}
+    <div>
+      <div class="page-title">✏️ Editar <span>{{ tournament.name }}</span></div>
+      <div class="page-subtitle">Configurações, datas e jogos do torneio.</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <a href="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}" class="btn btn-secondary">← Voltar</a>
+  </div>
+</div>
+
+<!-- ── Tab nav ── -->
+<div class="etab-nav">
+  <a class="etab-btn active" onclick="showETab('tab-info',this)">⚙️ Informações</a>
+  <a class="etab-btn" onclick="showETab('tab-matches',this)">📅 Jogos & Datas</a>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 1 — INFORMAÇÕES DO TORNEIO
+══════════════════════════════════════════════════════ -->
+<div id="tab-info" class="etab-pane on">
+  <form method="POST" action="{{ url_for('tournament.edit_tournament', tournament_id=tournament.id) }}"
+        enctype="multipart/form-data">
+    <input type="hidden" name="_tab" value="info" />
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+
+      <!-- Coluna esquerda -->
+      <div>
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-title">🏆 Identidade</div>
+
+          <div class="form-group">
+            <label class="form-label">Nome do Torneio *</label>
+            <input type="text" name="name" class="form-control" value="{{ tournament.name }}" required />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Desporto</label>
+              <select name="sport" class="form-control">
+                <option value="futsal" {% if tournament.sport=='futsal' %}selected{% endif %}>⚽ Futsal</option>
+                <option value="football" {% if tournament.sport=='football' %}selected{% endif %}>🏟️ Futebol 11</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Estado</label>
+              <select name="status" class="form-control">
+                <option value="pending"  {% if tournament.status=='pending'  %}selected{% endif %}>⏳ Inscrições Abertas</option>
+                <option value="active"   {% if tournament.status=='active'   %}selected{% endif %}>🟢 Ativo</option>
+                <option value="finished" {% if tournament.status=='finished' %}selected{% endif %}>⬛ Terminado</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Data de Início</label>
+              <input type="date" name="start_date" class="form-control"
+                     value="{{ tournament.start_date or '' }}" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Nº Máx. Equipas</label>
+              <input type="number" name="teams_count" class="form-control"
+                     value="{{ tournament.teams_count or '' }}" min="2" max="128" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Descrição</label>
+            <textarea name="description" class="form-control" rows="3"
+                      placeholder="Descrição opcional...">{{ tournament.description or '' }}</textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Logo (deixa vazio para manter o atual)</label>
+            {% if tournament.logo_url %}
+            <div style="margin-bottom:8px;">
+              <img src="{{ url_for('static', filename=tournament.logo_url) }}"
+                   style="height:48px;border-radius:6px;border:1px solid var(--border);" />
+            </div>
+            {% endif %}
+            <input type="file" name="logo" class="form-control" accept="image/*" />
+          </div>
+        </div>
+
+        <!-- Financeiro -->
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-title">💰 Financeiro</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Moeda</label>
+              <input type="text" name="currency" class="form-control"
+                     value="{{ tournament.currency or 'KWZ' }}" style="max-width:90px;" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Taxa de Inscrição</label>
+              <input type="number" name="registration_fee" class="form-control"
+                     value="{{ tournament.registration_fee or 0 }}" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Taxa de Participação</label>
+              <input type="number" name="participation_fee" class="form-control"
+                     value="{{ tournament.participation_fee or 0 }}" min="0" step="0.01" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Prémio Total</label>
+            <input type="number" name="prize_pool_total" class="form-control"
+                   value="{{ tournament.prize_pool_total or 0 }}" min="0" step="0.01" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Coluna direita -->
+      <div>
+        <div class="card" style="margin-bottom:18px;">
+          <div class="card-title">🏗️ Estrutura</div>
+
+          <div class="form-group">
+            <label class="form-label">Tipo</label>
+            <select name="type" class="form-control">
+              <option value="liga"                {% if tournament.type=='liga' %}selected{% endif %}>⚽ Liga (Round-robin)</option>
+              <option value="grupos_eliminatoria" {% if tournament.type=='grupos_eliminatoria' %}selected{% endif %}>🏆 Grupos + Mata-mata</option>
+              <option value="eliminatoria"        {% if tournament.type=='eliminatoria' %}selected{% endif %}>⚔️ Eliminatória Direta</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Formato</label>
+            <select name="format_type" class="form-control">
+              <option value="campeonato" {% if tournament.format_type=='campeonato' %}selected{% endif %}>🏆 Campeonato</option>
+              <option value="liga"       {% if tournament.format_type=='liga' %}selected{% endif %}>⚽ Liga</option>
+              <option value="torneio"    {% if tournament.format_type=='torneio' %}selected{% endif %}>🥇 Torneio</option>
+              <option value="taca"       {% if tournament.format_type=='taca' %}selected{% endif %}>🏅 Taça</option>
+            </select>
+          </div>
+
+          <hr class="divider" />
+          <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;">Fase de Grupos</div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Nº de Grupos</label>
+              <input type="number" name="groups_count" class="form-control"
+                     value="{{ tournament.groups_count or 0 }}" min="0" max="16" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Equipas por Grupo</label>
+              <input type="number" name="teams_per_group" class="form-control"
+                     value="{{ tournament.teams_per_group or 0 }}" min="0" max="16" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Qualificam/Grupo</label>
+              <input type="number" name="qualify_per_group" class="form-control"
+                     value="{{ tournament.qualify_per_group or 2 }}" min="1" max="8" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Voltas na Fase de Grupos</label>
+            <select name="group_legs" class="form-control">
+              <option value="1" {% if tournament.group_legs==1 %}selected{% endif %}>1 Volta</option>
+              <option value="2" {% if tournament.group_legs==2 %}selected{% endif %}>2 Voltas (ida e volta)</option>
+            </select>
+          </div>
+
+          <hr class="divider" />
+          <div style="font-size:.78rem;font-weight:700;color:var(--text-muted);margin-bottom:10px;text-transform:uppercase;letter-spacing:.08em;">Fase Eliminatória</div>
+
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_groups"      value="has_groups"      {% if tournament.has_groups %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Tem Fase de Grupos
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_knockout"    value="has_knockout"    {% if tournament.has_knockout %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Tem Mata-mata
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_round_of_16" value="has_round_of_16" {% if tournament.has_round_of_16 %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Oitavos de Final
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_quarter"     value="has_quarter"     {% if tournament.has_quarter %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Quartos de Final
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_semi"        value="has_semi"        {% if tournament.has_semi %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Meia-Final
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:.85rem;">
+              <input type="checkbox" name="has_final"       value="has_final"       {% if tournament.has_final %}checked{% endif %}
+                     style="width:15px;height:15px;accent-color:var(--neon);" />
+              Final
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Voltas no Mata-mata</label>
+            <select name="knockout_legs" class="form-control">
+              <option value="1" {% if tournament.knockout_legs==1 %}selected{% endif %}>Jogo Único</option>
+              <option value="2" {% if tournament.knockout_legs==2 %}selected{% endif %}>Ida e Volta</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="save-row">
+      <button type="submit" class="btn btn-primary">💾 Guardar Informações</button>
+      <a href="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     TAB 2 — JOGOS & DATAS
+══════════════════════════════════════════════════════ -->
+<div id="tab-matches" class="etab-pane">
+
+  {% if not all_matches %}
+  <div class="empty-state">
+    <div class="empty-icon">📅</div>
+    <p>Nenhum jogo gerado ainda.</p>
+    <a href="{{ url_for('tournament.tournament_room', tournament_id=tournament.id) }}" class="btn btn-primary">Ir para o Torneio</a>
+  </div>
+  {% else %}
+
+  <!-- Bulk date shift -->
+  <div class="card" style="margin-bottom:20px;border-color:rgba(37,99,235,.3);">
+    <div class="card-title">📅 Reagendar em Massa</div>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:14px;">
+      Desloca todas as datas dos jogos por um número de dias (positivo = avançar, negativo = recuar).
+    </p>
+    <form method="POST" action="{{ url_for('tournament.bulk_reschedule', tournament_id=tournament.id) }}"
+          onsubmit="return confirm('Reagendar todos os jogos?')">
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Dias a deslocar</label>
+          <input type="number" name="days_shift" class="form-control" value="7"
+                 style="width:110px;" placeholder="Ex: 7 ou -3" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label class="form-label">Apenas jogos com estado</label>
+          <select name="status_filter" class="form-control" style="width:160px;">
+            <option value="">Todos</option>
+            <option value="scheduled">Agendados</option>
+            <option value="live">Ao Vivo</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">🔄 Reagendar</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Per-match editing -->
+  <form method="POST" action="{{ url_for('tournament.edit_matches', tournament_id=tournament.id) }}">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <span style="font-size:.82rem;color:var(--text-muted);">Filtrar:</span>
+      <select id="filter-phase" class="form-control" style="width:auto;font-size:.8rem;"
+              onchange="filterMatches()">
+        <option value="">Todas as fases</option>
+        <option value="group">Fase de Grupos</option>
+        <option value="round_of_16">Oitavos</option>
+        <option value="quarter">Quartos</option>
+        <option value="semi">Meias-Finais</option>
+        <option value="final">Final</option>
+      </select>
+      <select id="filter-status" class="form-control" style="width:auto;font-size:.8rem;"
+              onchange="filterMatches()">
+        <option value="">Todos os estados</option>
+        <option value="scheduled">Agendados</option>
+        <option value="live">Ao Vivo</option>
+        <option value="finished">Terminados</option>
+      </select>
+      <span id="match-count" style="font-size:.78rem;color:var(--text-muted);margin-left:auto;"></span>
+    </div>
+
+    <!-- Column headers -->
+    <div style="display:grid;grid-template-columns:1fr 80px 80px 1fr 120px 100px 36px;gap:8px;
+         padding:6px 12px;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+         color:var(--text-muted);">
+      <span>Casa</span><span style="text-align:center;">Golo</span><span style="text-align:center;">Golo</span>
+      <span style="text-align:right;">Fora</span><span>Data</span><span>Estado</span><span></span>
+    </div>
+
+    <div id="matches-list">
+    {% set ns = namespace(cur_round=0, cur_phase='') %}
+    {% for m in all_matches %}
+      {% if m.phase != ns.cur_phase or m.round_number != ns.cur_round %}
+        {% set ns.cur_phase = m.phase %}
+        {% set ns.cur_round = m.round_number %}
+        <div class="round-header" data-phase="{{ m.phase }}">
+          {% if m.phase == 'group' %}
+            Jornada {{ m.round_number }}{% if m.group_letter %} — Grupo {{ m.group_letter }}{% endif %}
+          {% elif m.phase == 'round_of_16' %}⚔️ Oitavos de Final
+          {% elif m.phase == 'quarter' %}⚔️ Quartos de Final
+          {% elif m.phase == 'semi' %}🔥 Meia-Final
+          {% elif m.phase == 'final' %}🏆 FINAL
+          {% else %}{{ m.phase }}{% endif %}
+        </div>
+      {% endif %}
+
+      <div class="match-edit-row" data-phase="{{ m.phase }}" data-status="{{ m.status }}">
+        <!-- Team 1 -->
+        <div class="team-label">{{ m.team1.name }}</div>
+
+        <!-- Score 1 -->
+        <input type="number" name="score1_{{ m.id }}" class="score-inp"
+               value="{{ m.score1 if m.score1 is not none else '' }}"
+               min="0" max="99" placeholder="—" />
+
+        <!-- Score 2 -->
+        <input type="number" name="score2_{{ m.id }}" class="score-inp"
+               value="{{ m.score2 if m.score2 is not none else '' }}"
+               min="0" max="99" placeholder="—" />
+
+        <!-- Team 2 -->
+        <div class="team-label right">{{ m.team2.name }}</div>
+
+        <!-- Date -->
+        <input type="date" name="date_{{ m.id }}" class="date-inp"
+               value="{{ m.date or '' }}" />
+
+        <!-- Status -->
+        <select name="status_{{ m.id }}" class="status-sel">
+          <option value="scheduled" {% if m.status=='scheduled' %}selected{% endif %}>📅 Agendado</option>
+          <option value="live"      {% if m.status=='live'      %}selected{% endif %}>🔴 Ao Vivo</option>
+          <option value="finished"  {% if m.status=='finished'  %}selected{% endif %}>✅ Terminado</option>
+        </select>
+
+        <!-- Link -->
+        <a href="{{ url_for('match.match_detail', match_id=m.id) }}"
+           title="Ver jogo" style="display:flex;align-items:center;justify-content:center;
+           width:32px;height:32px;border-radius:6px;background:var(--bg-primary);
+           border:1px solid var(--border);color:var(--text-muted);font-size:.8rem;text-decoration:none;">↗</a>
+      </div>
+    {% endfor %}
+    </div>
+
+    <div class="save-row">
+      <button type="submit" class="btn btn-primary">💾 Guardar Todos os Jogos</button>
+      <span style="font-size:.78rem;color:var(--text-muted);">As classificações são recalculadas automaticamente para jogos terminados.</span>
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+<script>
+function showETab(id, btn) {
+  document.querySelectorAll('.etab-pane').forEach(p => p.classList.remove('on'));
+  document.querySelectorAll('.etab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('on');
+  if (btn) btn.classList.add('active');
+}
+
+function filterMatches() {
+  var phase  = document.getElementById('filter-phase').value;
+  var status = document.getElementById('filter-status').value;
+  var rows   = document.querySelectorAll('.match-edit-row');
+  var headers = document.querySelectorAll('.round-header');
+  var visible = 0;
+
+  rows.forEach(function(row) {
+    var show = (!phase  || row.dataset.phase  === phase) &&
+               (!status || row.dataset.status === status);
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  // Hide headers with no visible rows
+  headers.forEach(function(h) {
+    var phaseKey = h.dataset.phase;
+    var hasVisible = false;
+    var next = h.nextElementSibling;
+    while (next && next.classList.contains('match-edit-row')) {
+      if (next.style.display !== 'none') { hasVisible = true; break; }
+      next = next.nextElementSibling;
+    }
+    h.style.display = hasVisible ? '' : 'none';
+  });
+
+  var cnt = document.getElementById('match-count');
+  if (cnt) cnt.textContent = visible + ' jogo(s) visível(is)';
+}
+
+// Init count
+document.addEventListener('DOMContentLoaded', function() {
+  var total = document.querySelectorAll('.match-edit-row').length;
+  var cnt = document.getElementById('match-count');
+  if (cnt) cnt.textContent = total + ' jogo(s)';
+});
+</script>
+{% endblock %}

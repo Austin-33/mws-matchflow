@@ -10,6 +10,8 @@ from flask_login import login_required, current_user
 from extensions import db
 from models.team import Team, Player, TeamPost
 
+from utils.permissions import require_manager
+
 team_bp = Blueprint('team', __name__)
 
 POSITIONS_FUTSAL = ['GR', 'FIX', 'ALA-D', 'ALA-E', 'PV']
@@ -21,7 +23,7 @@ FORMATIONS_FOOTBALL = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2', '3-4-3', '
 
 def _save_upload(file, subfolder):
     """Save uploaded image, return relative URL or None."""
-    from app import allowed_file
+    from austinapp import allowed_file
     if not file or not file.filename:
         return None
     if not allowed_file(file.filename):
@@ -53,6 +55,7 @@ def list_teams():
 
 @team_bp.route('/teams/create', methods=['GET', 'POST'])
 @login_required
+@require_manager
 def create_team():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
@@ -333,65 +336,230 @@ def import_players_excel(team_id):
         return redirect(url_for('team.team_room', team_id=team_id))
 
     try:
-        wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        # ── Carregar workbook ─────────────────────────────────
+        # read_only=False para compatibilidade máxima com ficheiros .xls/.xlsx
+        wb = openpyxl.load_workbook(file, data_only=True)
         ws = wb.active
-        headers = [str(c.value or '').strip().lower() for c in ws[1]]
-        col = {h: i for i, h in enumerate(headers)}
 
-        def get(row, *keys):
+        # ── Ler headers da primeira linha ─────────────────────
+        # Normalizar: minúsculas, sem espaços extra, sem acentos problemáticos
+        def norm(s):
+            """Normaliza header: minúsculas, strip, remove acentos comuns."""
+            if s is None:
+                return ''
+            s = str(s).strip().lower()
+            # Substituições de acentos para matching robusto
+            replacements = {
+                'ã': 'a', 'á': 'a', 'à': 'a', 'â': 'a',
+                'é': 'e', 'ê': 'e', 'è': 'e',
+                'í': 'i', 'î': 'i',
+                'ó': 'o', 'ô': 'o', 'õ': 'o',
+                'ú': 'u', 'û': 'u',
+                'ç': 'c',
+                'º': 'o', 'ª': 'a',
+            }
+            for orig, rep in replacements.items():
+                s = s.replace(orig, rep)
+            return s
+
+        # Ler todas as linhas como lista de listas
+        all_rows = list(ws.iter_rows(values_only=True))
+        if not all_rows:
+            flash('Ficheiro Excel vazio.', 'error')
+            return redirect(url_for('team.team_room', team_id=team_id))
+
+        # Encontrar a linha de headers (primeira linha não vazia)
+        header_row_idx = 0
+        for i, row in enumerate(all_rows):
+            if any(v is not None for v in row):
+                header_row_idx = i
+                break
+
+        raw_headers = all_rows[header_row_idx]
+        headers_norm = [norm(h) for h in raw_headers]
+
+        # Mapa de header normalizado → índice da coluna
+        col = {h: i for i, h in enumerate(headers_norm) if h}
+
+        # ── Função para obter valor de uma célula ─────────────
+        def get_val(row, *keys):
+            """Tenta vários nomes de coluna, retorna string ou ''."""
             for k in keys:
-                idx = col.get(k)
-                if idx is not None and row[idx].value is not None:
-                    return str(row[idx].value).strip()
+                k_norm = norm(k)
+                idx = col.get(k_norm)
+                if idx is not None and idx < len(row) and row[idx] is not None:
+                    val = str(row[idx]).strip()
+                    if val and val.lower() not in ('none', 'nan', '-', '—'):
+                        return val
             return ''
 
-        def get_int(row, *keys):
+        def get_int_val(row, *keys):
+            """Tenta vários nomes de coluna, retorna int ou None."""
             for k in keys:
-                idx = col.get(k)
-                if idx is not None:
+                k_norm = norm(k)
+                idx = col.get(k_norm)
+                if idx is not None and idx < len(row) and row[idx] is not None:
                     try:
-                        return int(row[idx].value)
+                        # Pode vir como float (ex: 25.0) do Excel
+                        return int(float(str(row[idx]).strip()))
                     except (TypeError, ValueError):
                         pass
             return None
 
-        imported = skipped = 0
-        for row in ws.iter_rows(min_row=2):
-            if all(c.value is None for c in row):
-                continue
-            name = get(row, 'nome', 'name')
-            if not name:
-                skipped += 1
-                continue
-            if Player.query.filter_by(name=name, team_id=team_id).first():
-                skipped += 1
-                continue
-            db.session.add(Player(
-                name=name, nickname=get(row, 'alcunha', 'nickname'),
-                number=get_int(row, 'nº', 'numero', 'number'),
-                position=get(row, 'posição', 'posicao', 'position'),
-                birth_date=get(row, 'data nascimento', 'nascimento', 'birth_date'),
-                age=get_int(row, 'idade', 'age'),
-                nationality=get(row, 'nacionalidade', 'nationality'),
-                id_number=get(row, 'cc', 'id', 'passaporte'),
-                phone=get(row, 'telefone', 'phone'),
-                email=get(row, 'email'),
-                height_cm=get_int(row, 'altura', 'height'),
-                weight_kg=get_int(row, 'peso', 'weight'),
-                dominant_foot=get(row, 'pé', 'pe', 'foot') or 'Direito',
-                status=get(row, 'estado', 'status') or 'ativo',
-                contract_start=get(row, 'contrato inicio', 'contract_start'),
-                contract_end=get(row, 'contrato fim', 'contract_end'),
-                team_id=team_id,
-            ))
-            imported += 1
+        # ── Processar linhas de dados ─────────────────────────
+        imported = updated = skipped = errors = 0
+        error_details = []
 
-        db.session.commit()
+        data_rows = all_rows[header_row_idx + 1:]
+
+        for row_num, row in enumerate(data_rows, start=header_row_idx + 2):
+            # Ignorar linhas completamente vazias
+            if all(v is None or str(v).strip() == '' for v in row):
+                continue
+
+            try:
+                # Nome é o único campo obrigatório
+                name = get_val(row,
+                    'nome', 'name', 'nome completo', 'full name',
+                    'jogador', 'player', 'nome do jogador')
+
+                if not name:
+                    # Tentar usar a primeira coluna não vazia como nome
+                    for v in row:
+                        if v is not None and str(v).strip():
+                            name = str(v).strip()
+                            break
+
+                if not name:
+                    skipped += 1
+                    continue
+
+                # Limpar nome (remover números de linha acidentais)
+                if name.isdigit():
+                    skipped += 1
+                    continue
+
+                # Recolher todos os campos (incompletos são aceites)
+                nickname      = get_val(row, 'alcunha', 'nickname', 'apelido', 'nome guerra')
+                number_raw    = get_int_val(row, 'no', 'numero', 'number', 'num', 'camisa', 'camisola')
+                position      = get_val(row, 'posicao', 'posição', 'position', 'pos', 'funcao')
+                sec_position  = get_val(row, 'posicao secundaria', 'secondary position', 'pos2')
+                birth_date    = get_val(row, 'data nascimento', 'nascimento', 'birth date',
+                                        'birth_date', 'data de nascimento', 'dob')
+                age_raw       = get_int_val(row, 'idade', 'age', 'anos')
+                nationality   = get_val(row, 'nacionalidade', 'nationality', 'pais', 'país')
+                id_number     = get_val(row, 'cc', 'id', 'passaporte', 'bi', 'documento',
+                                        'id number', 'nif', 'bilhete')
+                phone         = get_val(row, 'telefone', 'phone', 'telemovel', 'tel', 'contacto')
+                email         = get_val(row, 'email', 'e-mail', 'mail')
+                height_raw    = get_int_val(row, 'altura', 'height', 'alt', 'height cm')
+                weight_raw    = get_int_val(row, 'peso', 'weight', 'kg', 'weight kg')
+                dominant_foot = get_val(row, 'pe', 'pé', 'foot', 'pe dominante', 'dominant foot') or 'Direito'
+                status_raw    = get_val(row, 'estado', 'status', 'situacao', 'situação') or 'ativo'
+                contract_start = get_val(row, 'contrato inicio', 'contract start',
+                                         'contract_start', 'inicio contrato', 'data inicio')
+                contract_end   = get_val(row, 'contrato fim', 'contract end',
+                                         'contract_end', 'fim contrato', 'data fim', 'validade')
+
+                # Normalizar status
+                status_map = {
+                    'ativo': 'ativo', 'active': 'ativo', 'activo': 'ativo',
+                    'lesionado': 'lesionado', 'injured': 'lesionado', 'lesao': 'lesionado',
+                    'suspenso': 'suspenso', 'suspended': 'suspenso',
+                    'inativo': 'inativo', 'inactive': 'inativo', 'inactivo': 'inativo',
+                    'pendente': 'pendente', 'pending': 'pendente',
+                }
+                status = status_map.get(norm(status_raw), 'ativo')
+
+                # Normalizar pé dominante
+                foot_map = {
+                    'direito': 'Direito', 'right': 'Direito', 'd': 'Direito',
+                    'esquerdo': 'Esquerdo', 'left': 'Esquerdo', 'e': 'Esquerdo',
+                    'ambos': 'Ambos', 'both': 'Ambos',
+                }
+                dominant_foot = foot_map.get(norm(dominant_foot), dominant_foot or 'Direito')
+
+                # ── Verificar se jogador já existe (pelo nome + equipa) ──
+                existing = Player.query.filter_by(name=name, team_id=team_id).first()
+
+                if existing:
+                    # Atualizar campos que vieram preenchidos (não sobrescrever com vazio)
+                    if nickname:        existing.nickname       = nickname
+                    if number_raw:      existing.number         = number_raw
+                    if position:        existing.position       = position
+                    if sec_position:    existing.secondary_position = sec_position
+                    if birth_date:      existing.birth_date     = birth_date
+                    if age_raw:         existing.age            = age_raw
+                    if nationality:     existing.nationality    = nationality
+                    if id_number:       existing.id_number      = id_number
+                    if phone:           existing.phone          = phone
+                    if email:           existing.email          = email
+                    if height_raw:      existing.height_cm      = height_raw
+                    if weight_raw:      existing.weight_kg      = weight_raw
+                    existing.dominant_foot  = dominant_foot
+                    existing.status         = status
+                    if contract_start:  existing.contract_start = contract_start
+                    if contract_end:    existing.contract_end   = contract_end
+                    updated += 1
+                else:
+                    # Criar novo jogador (campos incompletos são aceites)
+                    player = Player(
+                        name=name,
+                        nickname=nickname or None,
+                        number=number_raw,
+                        position=position or None,
+                        secondary_position=sec_position or None,
+                        birth_date=birth_date or None,
+                        age=age_raw,
+                        nationality=nationality or None,
+                        id_number=id_number or None,
+                        phone=phone or None,
+                        email=email or None,
+                        height_cm=height_raw,
+                        weight_kg=weight_raw,
+                        dominant_foot=dominant_foot,
+                        status=status,
+                        contract_start=contract_start or None,
+                        contract_end=contract_end or None,
+                        team_id=team_id,
+                    )
+                    db.session.add(player)
+                    imported += 1
+
+            except Exception as row_err:
+                errors += 1
+                error_details.append(f'Linha {row_num}: {row_err}')
+                # Continuar para a próxima linha em vez de abortar tudo
+                db.session.rollback()
+                continue
+
+        # ── Commit final ──────────────────────────────────────
+        try:
+            db.session.commit()
+        except Exception as commit_err:
+            db.session.rollback()
+            flash(f'❌ Erro ao guardar: {commit_err}', 'error')
+            return redirect(url_for('team.team_room', team_id=team_id))
+
         wb.close()
-        flash(f'✅ {imported} jogadores importados! ({skipped} ignorados)', 'success')
+
+        # ── Mensagem de resultado ─────────────────────────────
+        parts = []
+        if imported:  parts.append(f'✅ {imported} importados')
+        if updated:   parts.append(f'🔄 {updated} atualizados')
+        if skipped:   parts.append(f'⏭️ {skipped} ignorados (sem nome)')
+        if errors:    parts.append(f'⚠️ {errors} com erro')
+
+        msg = ' · '.join(parts) if parts else 'Nenhum jogador processado.'
+        flash(msg, 'success' if (imported or updated) else 'info')
+
+        # Mostrar detalhes de erros se houver
+        for detail in error_details[:5]:  # máximo 5 erros detalhados
+            flash(detail, 'error')
+
     except Exception as e:
         db.session.rollback()
-        flash(f'Erro: {e}', 'error')
+        flash(f'❌ Erro ao ler o ficheiro Excel: {e}', 'error')
 
     return redirect(url_for('team.team_room', team_id=team_id))
 
@@ -402,18 +570,61 @@ def download_excel_template():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = 'Jogadores'
-    hf = PatternFill(start_color='1E3A5F', end_color='1E3A5F', fill_type='solid')
+
+    # Estilos
+    hf    = PatternFill(start_color='1E3A5F', end_color='1E3A5F', fill_type='solid')
     hfont = Font(bold=True, color='FFFFFF', size=11)
-    headers = [('Nome *',25),('Alcunha',18),('Nº',6),('Posição',12),('Data Nascimento',18),
-               ('Idade',8),('Nacionalidade',18),('CC',16),('Telefone',16),('Email',25),
-               ('Altura',10),('Peso',8),('Pé',10),('Estado',12),('Contrato Inicio',16),('Contrato Fim',16)]
-    for i,(h,w) in enumerate(headers,1):
-        c = ws.cell(row=1,column=i,value=h)
-        c.font=hfont; c.fill=hf; c.alignment=Alignment(horizontal='center')
-        ws.column_dimensions[get_column_letter(i)].width=w
+    ex_fill = PatternFill(start_color='0D1526', end_color='0D1526', fill_type='solid')
+    ex_font = Font(color='4B6080', italic=True, size=10)
+
+    # Colunas: (header, largura, exemplo)
+    columns = [
+        ('Nome *',           25, 'Cristiano Ronaldo'),
+        ('Alcunha',          18, 'CR7'),
+        ('Nº',                6, '7'),
+        ('Posição',          12, 'ALA-D'),
+        ('Data Nascimento',  18, '1985-02-05'),
+        ('Idade',             8, '39'),
+        ('Nacionalidade',    18, 'Portuguesa'),
+        ('CC',               16, '12345678'),
+        ('Telefone',         16, '+351 912 345 678'),
+        ('Email',            25, 'cr7@austin.com'),
+        ('Altura',           10, '187'),
+        ('Peso',              8, '83'),
+        ('Pé',               10, 'Direito'),
+        ('Estado',           12, 'ativo'),
+        ('Contrato Inicio',  16, '2024-01-01'),
+        ('Contrato Fim',     16, '2025-12-31'),
+    ]
+
+    # Linha 1 — Headers
+    for i, (h, w, _) in enumerate(columns, 1):
+        c = ws.cell(row=1, column=i, value=h)
+        c.font = hfont
+        c.fill = hf
+        c.alignment = Alignment(horizontal='center')
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+    # Linha 2 — Exemplo (em cinzento)
+    for i, (_, _, ex) in enumerate(columns, 1):
+        c = ws.cell(row=2, column=i, value=ex)
+        c.font = ex_font
+        c.fill = ex_fill
+        c.alignment = Alignment(horizontal='center')
+
+    # Linha 3 — Linha vazia para o utilizador começar a preencher
+    # (deixar em branco)
+
+    # Nota na célula A4
+    ws.cell(row=4, column=1,
+            value='⚠️ A linha 2 é apenas um exemplo — podes apagá-la. Só o campo "Nome *" é obrigatório.')
+    ws.cell(row=4, column=1).font = Font(color='F59E0B', italic=True, size=9)
+
     buf = io.BytesIO()
-    wb.save(buf); buf.seek(0)
-    return send_file(buf, as_attachment=True, download_name='ALC_template_jogadores.xlsx',
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True,
+                     download_name='ALC_template_jogadores.xlsx',
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 

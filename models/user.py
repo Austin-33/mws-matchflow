@@ -23,6 +23,7 @@ class User(UserMixin, db.Model):
 
     # ─── Perfil ───────────────────────────────────────────────
     full_name = db.Column(db.String(150))
+    avatar_url = db.Column(db.String(300), default='')
     role = db.Column(db.String(20), default='manager')
     # sport_role: player | coach | ceo | admin | manager
     sport_role = db.Column(db.String(20), default='player')
